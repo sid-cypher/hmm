@@ -14,9 +14,19 @@ main = do
 testCases :: Test
 testCases =
 	test
-	[mmLabels (mmParseFromString "") @=? []
-	,mmLabels (mmParseFromString " \n  ") @=? []
-	,mmLabels (mmParseFromString "$( $)") @=? []
-	,mmLabels (mmParseFromString "$( $)         ") @=? []
-	,mmLabels (mmParseFromString " \t\n  $( hoi\nhoi $) ") @=? []
+	[mmParseFromString "" @=? emptyDatabase
+	,mmParseFromString " \n  " @=? emptyDatabase
+	,mmParseFromString "$( $)" @=? emptyDatabase
+	,mmParseFromString "$( $)         " @=? emptyDatabase
+	,mmParseFromString " \t\n  $( hoi\nhoi $) " @=? emptyDatabase
+	,mmParseFromString "$c x $." @=? emptyDatabase `withConstant` "x"
+	,mmParseFromString "$c y $." @=? emptyDatabase `withConstant` "y"
+	,mmParseFromString "$c x z y $." @=? emptyDatabase `withConstants` ["x", "y", "z"]
+	,mmParseFromString "$c $( no constants here $) $." @=? emptyDatabase
+	,mmParseFromString "$c x $( a comment\nin the middle $) y $." @=? emptyDatabase `withConstants` ["x", "y"]
 	]
+
+emptyDatabase = Database {dbConstants = []}
+
+(Database cs) `withConstant` c = Database {dbConstants = c:cs}
+(Database cs) `withConstants` cs2 = Database {dbConstants = cs2++cs}
