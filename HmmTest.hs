@@ -98,7 +98,7 @@ testCases =
 			,("min", [Con "|-", Var "P"], DollarE)
 			,("maj", [Con "|-", Con "(", Var "P", Con "->", Var "Q", Con ")"], DollarE)
 			]
-			[("mp", [Con "|-", Var "Q"], Axiom [{-"min", "maj"-}])
+			[("mp", [Con "|-", Var "Q"], Axiom ["min", "maj"])
 			]
 		)
 
@@ -124,7 +124,7 @@ testCases =
 			,("wim",[Con "wff",Con "(",Var "P",Con "->",Var "Q",Con ")"],Axiom [])
 			,("a1",[Con "|-",Con "(",Var "t",Con "=",Var "r",Con "->",Con "(",Var "t",Con "=",Var "s",Con "->",Var "r",Con "=",Var "s",Con ")",Con ")"],Axiom [])
 			,("a2",[Con "|-",Con "(",Var "t",Con "+",Con "0",Con ")",Con "=",Var "t"],Axiom [])
-			,("mp",[Con "|-",Var "Q"],Axiom [])
+			,("mp",[Con "|-",Var "Q"],Axiom ["min", "maj"])
 			,("th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem [] ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"])
 			]
 		)}

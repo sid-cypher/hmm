@@ -31,6 +31,13 @@ dbEmpty = Database [] []
 
 Database iss1 ass1 `dbWith` Database iss2 ass2 = Database (iss1++iss2) (ass1++ass2)
 
+activeDollarE :: Database -> [String]
+activeDollarE (Database _ activeStatements) =
+	[label |
+		(label, _, info) <- activeStatements,
+		case info of {DollarE -> True; _ -> False}
+	]
+
 
 isAssertion :: Statement -> Bool
 isAssertion (_, _, Theorem _ _) = True
@@ -80,9 +87,10 @@ mmpStatements :: (Context, Database) -> Parser (Context, Database)
 mmpStatements (ctx, db) =
 		do
 			(ctx2, dbstat) <- mmpStatement (ctx, db)
+			let db2 = db `dbWith` dbstat
 			(do
 				mmpSeparator
-				(ctx3, dbstats) <- mmpStatements (ctx2, dbstat)
+				(ctx3, dbstats) <- mmpStatements (ctx2, db2)
 				return (ctx3, dbstat `dbWith` dbstats)
 			 <|> return (ctx2, dbstat))
 		<|> return (ctx, dbEmpty)
@@ -147,7 +155,7 @@ mmpAxiom (ctx, db) = do
 		label <- mmpTryLabeled "$a"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$."
-		return (ctx, Database [] [(label, mapSymbols ctx ss, Axiom [])])
+		return (ctx, Database [] [(label, mapSymbols ctx ss, Axiom (activeDollarE db))])
 
 mmpTheorem :: (Context, Database) -> Parser (Context, Database)
 mmpTheorem (ctx, db) = do
