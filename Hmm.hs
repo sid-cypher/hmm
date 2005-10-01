@@ -1,6 +1,6 @@
 module Hmm
 	(Database(Database)
-	,dbConstants
+	,dbEmpty,dbWithConstants
 	,mmParseFromString
 	)
 
@@ -11,36 +11,45 @@ import Data.List(sort)
 import Data.Char(isSpace,isAscii,isControl)
 
 
+
+
 data Database = Database {dbConstants::[String]} deriving Show
+
+dbEmpty = Database {dbConstants = []}
+
+(Database cs) `dbWithConstants` cs2 = Database {dbConstants = cs2++cs}
 
 instance Eq Database where
 	d1 == d2 = sort (dbConstants d1) == sort (dbConstants d2)
 
 
 
+
+
+
 mmParseFromString :: String -> Database
 mmParseFromString s =
-	case parse mmParser "<string>" s of
+	case parse mmpDatabase "<string>" s of
 		Left err -> error $ show err
 		Right db -> db
 
 
-mmParser :: Parser Database
-mmParser = do
-		try mmSep <|> return ()
-		cs <- mmConstants `sepBy` mmSep
-		try mmSep <|> return ()
+mmpDatabase :: Parser Database
+mmpDatabase = do
+		try mmpSeparator <|> return ()
+		cs <- mmConstants `sepBy` mmpSeparator
+		try mmpSeparator <|> return ()
 		eof
 		return $ Database {dbConstants = concat cs}
 
-mmSep :: Parser ()
-mmSep = do
-		many1 ((space >> return ()) <|> mmComment)
+mmpSeparator :: Parser ()
+mmpSeparator = do
+		many1 ((space >> return ()) <|> mmpComment)
 		return ()
 	<?> "whitespace or comment"
 
-mmComment :: Parser ()
-mmComment = do
+mmpComment :: Parser ()
+mmpComment = do
 		try (string "$(")
 		manyTill anyChar (try (space >> string "$)"))
 		return ()
@@ -49,11 +58,11 @@ mmComment = do
 mmConstants :: Parser [String]
 mmConstants = do
 		try (string "$c")
-		mmSep
-		cs <- manyTill (do {c<-mmIdentifier; mmSep; return c}) (try (string "$."))
+		mmpSeparator
+		cs <- manyTill (do {c<-mmpMathSymbol; mmpSeparator; return c}) (try (string "$."))
 		return cs
 
-mmIdentifier = many1 (satisfy isMmNonSpace)
+mmpMathSymbol = many1 (satisfy isMathSymbolChar)
 
-isMmNonSpace c = isAscii c && not (isSpace c) && not (isControl c)
+isMathSymbolChar c = isAscii c && not (isSpace c) && not (isControl c)
 

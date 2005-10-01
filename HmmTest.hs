@@ -14,19 +14,16 @@ main = do
 testCases :: Test
 testCases =
 	test
-	[mmParseFromString "" @=? emptyDatabase
-	,mmParseFromString " \n  " @=? emptyDatabase
-	,mmParseFromString "$( $)" @=? emptyDatabase
-	,mmParseFromString "$( $)         " @=? emptyDatabase
-	,mmParseFromString " \t\n  $( hoi\nhoi $) " @=? emptyDatabase
-	,mmParseFromString "$c x $." @=? emptyDatabase `withConstant` "x"
-	,mmParseFromString "$c y $." @=? emptyDatabase `withConstant` "y"
-	,mmParseFromString "$c x z y $." @=? emptyDatabase `withConstants` ["x", "y", "z"]
-	,mmParseFromString "$c $( no constants here $) $." @=? emptyDatabase
-	,mmParseFromString "$c x $( a comment\nin the middle $) y $." @=? emptyDatabase `withConstants` ["x", "y"]
+	[mmParseFromString "" @=? dbEmpty
+	,mmParseFromString " \n  " @=? dbEmpty
+	,mmParseFromString "$( $)" @=? dbEmpty
+	,mmParseFromString "$( $)         " @=? dbEmpty
+	,mmParseFromString " \t\n  $( hoi\nhoi $) " @=? dbEmpty
+	,mmParseFromString "$c x $." @=? dbEmpty `dbWithConstant` "x"
+	,mmParseFromString "$c y $." @=? dbEmpty `dbWithConstant` "y"
+	,mmParseFromString "$c x z y $." @=? dbEmpty `dbWithConstants` ["x", "y", "z"]
+	,mmParseFromString "$c $( no constants here $) $." @=? dbEmpty
+	,mmParseFromString "$c x $( a comment\nin the middle $) y $." @=? dbEmpty `dbWithConstants` ["x", "y"]
 	]
 
-emptyDatabase = Database {dbConstants = []}
-
-(Database cs) `withConstant` c = Database {dbConstants = c:cs}
-(Database cs) `withConstants` cs2 = Database {dbConstants = cs2++cs}
+db `dbWithConstant` c = db `dbWithConstants` [c]
