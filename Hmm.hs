@@ -1,6 +1,6 @@
 module Hmm
 	(Context(Context)
-	,ctxEmpty,ctxWithConstants
+	,ctxEmpty,ctxWithConstants,ctxWithVariables
 	,Database(Database)
 	,mmParseFromString
 	)
@@ -18,15 +18,19 @@ data Database = Database
 
 
 
-data Context = Context {ctxConstants::[String]}
+data Context = Context {ctxConstants::[String], ctxVariables::[String]}
 	deriving Show
 
 instance Eq Context where
-	d1 == d2 = sort (ctxConstants d1) == sort (ctxConstants d2)
+	d1 == d2 =
+		sort (ctxConstants d1) == sort (ctxConstants d2)
+		&& sort (ctxVariables d1) == sort (ctxVariables d2)
 
-ctxEmpty = Context {ctxConstants = []}
+ctxEmpty = Context {ctxConstants = [], ctxVariables = []}
 
-(Context cs) `ctxWithConstants` cs2 = Context {ctxConstants = cs2++cs}
+ctx `ctxWithConstants` cs = ctx {ctxConstants = cs ++ ctxConstants ctx}
+
+ctx `ctxWithVariables` vs = ctx {ctxVariables = vs ++ ctxVariables ctx}
 
 
 
@@ -35,24 +39,37 @@ ctxEmpty = Context {ctxConstants = []}
 
 mmParseFromString :: String -> (Context, Database)
 mmParseFromString s =
-	case parse mmpContext "<string>" s of
+	case parse mmpDatabase "<string>" s of
 		Left err -> error $ show err
 		Right result -> result
 
 
-mmpContext :: Parser (Context, Database)
-mmpContext = do
+mmpDatabase :: Parser (Context, Database)
+mmpDatabase = do
 		try mmpSeparator <|> return ()
-		cs <- mmConstants `sepBy` mmpSeparator
-		try mmpSeparator <|> return ()
+		(ctx, db) <- mmpStatements (ctxEmpty, Database)
 		eof
-		return $ (Context {ctxConstants = concat cs}, Database)
+		return (ctx, db)
+
+mmpStatements :: (Context, Database) -> Parser (Context, Database)
+mmpStatements (ctx, db) =
+		do
+			(ctx2, db2) <- mmpStatement (ctx, db)
+			(do
+				mmpSeparator
+				mmpStatements (ctx2, db2)
+			 <|> return (ctx2, db2))
+		<|> return (ctx, db)
+
+mmpStatement :: (Context, Database) -> Parser (Context, Database)
+mmpStatement (ctx, db) = do
+		(ctx2, db2) <- (mmpConstants (ctx, db) <|> mmpVariables (ctx, db))
+		return (ctx2, db2)
 
 mmpSeparator :: Parser ()
 mmpSeparator = do
 		many1 ((space >> return ()) <|> mmpComment)
 		return ()
-	<?> "token separator"
 
 mmpComment :: Parser ()
 mmpComment = do
@@ -61,14 +78,21 @@ mmpComment = do
 		return ()
 	    <?> "comment"
 
-mmConstants :: Parser [String]
-mmConstants = do
+mmpConstants :: (Context, Database) -> Parser (Context, Database)
+mmpConstants (ctx, db) = do
 		try (string "$c")
 		mmpSeparator
 		cs <- manyTill (do {c<-mmpMathSymbol; mmpSeparator; return c}) (try (string "$."))
-		return cs
+		return (ctx `ctxWithConstants` cs, db)
 
-mmpMathSymbol = many1 (satisfy isMathSymbolChar)
+mmpVariables :: (Context, Database) -> Parser (Context, Database)
+mmpVariables (ctx, db) = do
+		try (string "$v")
+		mmpSeparator
+		cs <- manyTill (do {c<-mmpMathSymbol; mmpSeparator; return c}) (try (string "$."))
+		return (ctx `ctxWithVariables` cs, db)
+
+mmpMathSymbol = many1 (satisfy isMathSymbolChar) <?> "math symbol"
 
 isMathSymbolChar c = isAscii c && not (isSpace c) && not (isControl c)
 
