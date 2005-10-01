@@ -1,6 +1,7 @@
 module Hmm
-	(Database(Database)
-	,dbEmpty,dbWithConstants
+	(Context(Context)
+	,ctxEmpty,ctxWithConstants
+	,Database(Database)
 	,mmParseFromString
 	)
 
@@ -12,41 +13,46 @@ import Data.Char(isSpace,isAscii,isControl)
 
 
 
-
-data Database = Database {dbConstants::[String]} deriving Show
-
-dbEmpty = Database {dbConstants = []}
-
-(Database cs) `dbWithConstants` cs2 = Database {dbConstants = cs2++cs}
-
-instance Eq Database where
-	d1 == d2 = sort (dbConstants d1) == sort (dbConstants d2)
+data Database = Database
+	deriving (Eq, Show)
 
 
 
+data Context = Context {ctxConstants::[String]}
+	deriving Show
+
+instance Eq Context where
+	d1 == d2 = sort (ctxConstants d1) == sort (ctxConstants d2)
+
+ctxEmpty = Context {ctxConstants = []}
+
+(Context cs) `ctxWithConstants` cs2 = Context {ctxConstants = cs2++cs}
 
 
 
-mmParseFromString :: String -> Database
+
+
+
+mmParseFromString :: String -> (Context, Database)
 mmParseFromString s =
-	case parse mmpDatabase "<string>" s of
+	case parse mmpContext "<string>" s of
 		Left err -> error $ show err
-		Right db -> db
+		Right result -> result
 
 
-mmpDatabase :: Parser Database
-mmpDatabase = do
+mmpContext :: Parser (Context, Database)
+mmpContext = do
 		try mmpSeparator <|> return ()
 		cs <- mmConstants `sepBy` mmpSeparator
 		try mmpSeparator <|> return ()
 		eof
-		return $ Database {dbConstants = concat cs}
+		return $ (Context {ctxConstants = concat cs}, Database)
 
 mmpSeparator :: Parser ()
 mmpSeparator = do
 		many1 ((space >> return ()) <|> mmpComment)
 		return ()
-	<?> "whitespace or comment"
+	<?> "token separator"
 
 mmpComment :: Parser ()
 mmpComment = do
