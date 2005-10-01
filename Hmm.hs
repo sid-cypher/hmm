@@ -3,7 +3,7 @@ module Hmm
 	,ctxEmpty,ctxWithConstants,ctxWithVariables
 	,Database(Database)
 	,Statement
-	,StatementInfo(DollarF)
+	,StatementInfo(DollarE, DollarF, Axiom, Theorem)
 	,Symbol(Var,Con)
 	,mmParseFromString
 	)
@@ -17,15 +17,18 @@ import Data.Char(isSpace,isAscii,isControl)
 
 
 data Database = Database [Statement]
-	deriving (Eq, Show)
+	deriving Show
+
+instance Eq Database where
+	Database ss1 == Database ss2 = sort ss1 == sort ss2
 
 type Statement = (String, [Symbol], StatementInfo)
 
-data StatementInfo = DollarF
-	deriving (Eq, Show)
+data StatementInfo = DollarE | DollarF | Axiom | Theorem [String]
+	deriving (Eq, Show, Ord)
 
 data Symbol = Var String | Con String
-	deriving (Eq, Show)
+	deriving (Eq, Show, Ord)
 
 
 (Database ss) `dbWithStatement` s = Database (s:ss)
@@ -77,7 +80,7 @@ mmpStatements (ctx, db) =
 
 mmpStatement :: (Context, Database) -> Parser (Context, Database)
 mmpStatement (ctx, db) = do
-		(ctx2, db2) <- (mmpConstants (ctx, db) <|> mmpVariables (ctx, db) <|> mmpDollarF (ctx, db))
+		(ctx2, db2) <- (mmpConstants (ctx, db) <|> mmpVariables (ctx, db) <|> mmpDollarE (ctx, db) <|> mmpDollarF (ctx, db) <|> mmpAxiom (ctx, db) <|> mmpTheorem (ctx, db))
 		return (ctx2, db2)
 
 mmpSeparator :: Parser ()
@@ -94,36 +97,61 @@ mmpComment = do
 
 mmpConstants :: (Context, Database) -> Parser (Context, Database)
 mmpConstants (ctx, db) = do
-		try (string "$c")
+		mmpTryUnlabeled "$c"
 		mmpSeparator
-		cs <- mmpUntilDollatDot
+		cs <- mmpIdentifiersThen "$."
 		return (ctx `ctxWithConstants` cs, db)
 
 mmpVariables :: (Context, Database) -> Parser (Context, Database)
 mmpVariables (ctx, db) = do
-		try (string "$v")
+		mmpTryUnlabeled "$v"
 		mmpSeparator
-		cs <- mmpUntilDollatDot
+		cs <- mmpIdentifiersThen "$."
 		return (ctx `ctxWithVariables` cs, db)
+
+mmpDollarE :: (Context, Database) -> Parser (Context, Database)
+mmpDollarE (ctx, db) = do
+		label <- mmpTryLabeled "$e"
+		mmpSeparator
+		ss <- mmpIdentifiersThen "$."
+		return (ctx, db `dbWithStatement` (label, mapSymbols ctx ss, DollarE))
 
 mmpDollarF :: (Context, Database) -> Parser (Context, Database)
 mmpDollarF (ctx, db) = do
-		label <- try $ do
+		label <- mmpTryLabeled "$f"
+		mmpSeparator
+		ss <- mmpIdentifiersThen "$."
+		return (ctx, db `dbWithStatement` (label, mapSymbols ctx ss, DollarF))
+
+mmpAxiom :: (Context, Database) -> Parser (Context, Database)
+mmpAxiom (ctx, db) = do
+		label <- mmpTryLabeled "$a"
+		mmpSeparator
+		ss <- mmpIdentifiersThen "$."
+		return (ctx, db `dbWithStatement` (label, mapSymbols ctx ss, Axiom))
+
+mmpTheorem :: (Context, Database) -> Parser (Context, Database)
+mmpTheorem (ctx, db) = do
+		label <- mmpTryLabeled "$p"
+		mmpSeparator
+		ss <- mmpIdentifiersThen "$="
+		mmpSeparator
+		ps <- mmpIdentifiersThen "$."
+		return (ctx, db `dbWithStatement` (label, mapSymbols ctx ss, Theorem ps))
+
+mmpTryUnlabeled :: String -> Parser ()
+mmpTryUnlabeled keyword = (try (string keyword) >> return ()) <?> (keyword ++ " keyword")
+
+mmpTryLabeled :: String -> Parser String
+mmpTryLabeled keyword = (try $ do
 				label <- mmpIdentifier
 				mmpSeparator
-				string "$f"
+				string keyword
 				return label
-		mmpSeparator
-		ss <- mmpUntilDollatDot
-		let symbols = map (\s ->
-				if s `elem` ctxConstants ctx then Con s
-				else if s `elem` ctxVariables ctx then Var s
-				else error ("Unknown math symbol " ++ s)
-			) ss
-		return (ctx, db `dbWithStatement` (label, symbols, DollarF))
+			) <?> ("labeled " ++ keyword ++ " keyword")
 
-mmpUntilDollatDot :: Parser [String]
-mmpUntilDollatDot = manyTill (do {s<-mmpIdentifier; mmpSeparator; return s}) (try (string "$."))
+mmpIdentifiersThen :: String -> Parser [String]
+mmpIdentifiersThen end = manyTill (do {s<-mmpIdentifier; mmpSeparator; return s}) (try (string end))
 
 mmpIdentifier :: Parser String
 mmpIdentifier = many1 (satisfy isMathSymbolChar) <?> "math symbol"
@@ -131,3 +159,8 @@ mmpIdentifier = many1 (satisfy isMathSymbolChar) <?> "math symbol"
 isMathSymbolChar :: Char -> Bool
 isMathSymbolChar c = isAscii c && not (isSpace c) && not (isControl c)
 
+mapSymbols :: Context -> [String] -> [Symbol]
+mapSymbols ctx = map $ \s ->
+			if s `elem` ctxConstants ctx then Con s
+			else if s `elem` ctxVariables ctx then Var s
+			else error ("Unknown math symbol " ++ s)
