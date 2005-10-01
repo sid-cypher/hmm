@@ -2,6 +2,9 @@ module Hmm
 	(Context(Context)
 	,ctxEmpty,ctxWithConstants,ctxWithVariables
 	,Database(Database)
+	,Statement
+	,StatementInfo(DollarF)
+	,Symbol(Var,Con)
 	,mmParseFromString
 	)
 
@@ -13,8 +16,19 @@ import Data.Char(isSpace,isAscii,isControl)
 
 
 
-data Database = Database
+data Database = Database [Statement]
 	deriving (Eq, Show)
+
+type Statement = (String, [Symbol], StatementInfo)
+
+data StatementInfo = DollarF
+	deriving (Eq, Show)
+
+data Symbol = Var String | Con String
+	deriving (Eq, Show)
+
+
+(Database ss) `dbWithStatement` s = Database (s:ss)
 
 
 
@@ -47,7 +61,7 @@ mmParseFromString s =
 mmpDatabase :: Parser (Context, Database)
 mmpDatabase = do
 		try mmpSeparator <|> return ()
-		(ctx, db) <- mmpStatements (ctxEmpty, Database)
+		(ctx, db) <- mmpStatements (ctxEmpty, Database [])
 		eof
 		return (ctx, db)
 
@@ -63,7 +77,7 @@ mmpStatements (ctx, db) =
 
 mmpStatement :: (Context, Database) -> Parser (Context, Database)
 mmpStatement (ctx, db) = do
-		(ctx2, db2) <- (mmpConstants (ctx, db) <|> mmpVariables (ctx, db))
+		(ctx2, db2) <- (mmpConstants (ctx, db) <|> mmpVariables (ctx, db) <|> mmpDollarF (ctx, db))
 		return (ctx2, db2)
 
 mmpSeparator :: Parser ()
@@ -82,17 +96,38 @@ mmpConstants :: (Context, Database) -> Parser (Context, Database)
 mmpConstants (ctx, db) = do
 		try (string "$c")
 		mmpSeparator
-		cs <- manyTill (do {c<-mmpMathSymbol; mmpSeparator; return c}) (try (string "$."))
+		cs <- mmpUntilDollatDot
 		return (ctx `ctxWithConstants` cs, db)
 
 mmpVariables :: (Context, Database) -> Parser (Context, Database)
 mmpVariables (ctx, db) = do
 		try (string "$v")
 		mmpSeparator
-		cs <- manyTill (do {c<-mmpMathSymbol; mmpSeparator; return c}) (try (string "$."))
+		cs <- mmpUntilDollatDot
 		return (ctx `ctxWithVariables` cs, db)
 
-mmpMathSymbol = many1 (satisfy isMathSymbolChar) <?> "math symbol"
+mmpDollarF :: (Context, Database) -> Parser (Context, Database)
+mmpDollarF (ctx, db) = do
+		label <- try $ do
+				label <- mmpIdentifier
+				mmpSeparator
+				string "$f"
+				return label
+		mmpSeparator
+		ss <- mmpUntilDollatDot
+		let symbols = map (\s ->
+				if s `elem` ctxConstants ctx then Con s
+				else if s `elem` ctxVariables ctx then Var s
+				else error ("Unknown math symbol " ++ s)
+			) ss
+		return (ctx, db `dbWithStatement` (label, symbols, DollarF))
 
+mmpUntilDollatDot :: Parser [String]
+mmpUntilDollatDot = manyTill (do {s<-mmpIdentifier; mmpSeparator; return s}) (try (string "$."))
+
+mmpIdentifier :: Parser String
+mmpIdentifier = many1 (satisfy isMathSymbolChar) <?> "math symbol"
+
+isMathSymbolChar :: Char -> Bool
 isMathSymbolChar c = isAscii c && not (isSpace c) && not (isControl c)
 
