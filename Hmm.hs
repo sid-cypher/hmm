@@ -72,30 +72,30 @@ mmParseFromString s =
 mmpDatabase :: Parser (Context, Database)
 mmpDatabase = do
 		try mmpSeparator <|> return ()
-		(ctx, db) <- mmpStatements ctxEmpty
+		(ctx, db) <- mmpStatements (ctxEmpty, dbEmpty)
 		eof
 		return (ctx, db)
 
-mmpStatements :: Context -> Parser (Context, Database)
-mmpStatements ctx =
+mmpStatements :: (Context, Database) -> Parser (Context, Database)
+mmpStatements (ctx, db) =
 		do
-			(ctx2, dbstat) <- mmpStatement ctx
+			(ctx2, dbstat) <- mmpStatement (ctx, db)
 			(do
 				mmpSeparator
-				(ctx3, dbstats) <- mmpStatements ctx2
+				(ctx3, dbstats) <- mmpStatements (ctx2, dbstat)
 				return (ctx3, dbstat `dbWith` dbstats)
 			 <|> return (ctx2, dbstat))
 		<|> return (ctx, dbEmpty)
 
-mmpStatement :: Context -> Parser (Context, Database)
-mmpStatement ctx =
-		(   mmpConstants ctx
-		<|> mmpVariables ctx
-		<|> mmpDollarE ctx
-		<|> mmpDollarF ctx
-		<|> mmpAxiom ctx
-		<|> mmpTheorem ctx
-		<|> mmpBlock ctx
+mmpStatement :: (Context, Database) -> Parser (Context, Database)
+mmpStatement (ctx, db) =
+		(   mmpConstants (ctx, db)
+		<|> mmpVariables (ctx, db)
+		<|> mmpDollarE (ctx, db)
+		<|> mmpDollarF (ctx, db)
+		<|> mmpAxiom (ctx, db)
+		<|> mmpTheorem (ctx, db)
+		<|> mmpBlock (ctx, db)
 		) <?> "statement"
 
 mmpSeparator :: Parser ()
@@ -110,29 +110,29 @@ mmpComment = do
 		return ()
 	    <?> "comment"
 
-mmpConstants :: Context -> Parser (Context, Database)
-mmpConstants ctx = do
+mmpConstants :: (Context, Database) -> Parser (Context, Database)
+mmpConstants (ctx, db) = do
 		mmpTryUnlabeled "$c"
 		mmpSeparator
 		cs <- mmpIdentifiersThen "$."
-		return (ctx `ctxWithConstants` cs, dbEmpty)
+		return (ctx `ctxWithConstants` cs, db)
 
-mmpVariables :: Context -> Parser (Context, Database)
-mmpVariables ctx = do
+mmpVariables :: (Context, Database) -> Parser (Context, Database)
+mmpVariables (ctx, db) = do
 		mmpTryUnlabeled "$v"
 		mmpSeparator
 		cs <- mmpIdentifiersThen "$."
-		return (ctx `ctxWithVariables` cs, dbEmpty)
+		return (ctx `ctxWithVariables` cs, db)
 
-mmpDollarE :: Context -> Parser (Context, Database)
-mmpDollarE ctx = do
+mmpDollarE :: (Context, Database) -> Parser (Context, Database)
+mmpDollarE (ctx, db) = do
 		label <- mmpTryLabeled "$e"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$."
 		return (ctx, Database [] [(label, mapSymbols ctx ss, DollarE)])
 
-mmpDollarF :: Context -> Parser (Context, Database)
-mmpDollarF ctx = do
+mmpDollarF :: (Context, Database) -> Parser (Context, Database)
+mmpDollarF (ctx, db) = do
 		label <- mmpTryLabeled "$f"
 		mmpSeparator
 		c <- mmpIdentifier
@@ -142,15 +142,15 @@ mmpDollarF ctx = do
 		string "$."
 		return (ctx, Database [] [(label, mapSymbols ctx [c, v], DollarF)])
 
-mmpAxiom :: Context -> Parser (Context, Database)
-mmpAxiom ctx = do
+mmpAxiom :: (Context, Database) -> Parser (Context, Database)
+mmpAxiom (ctx, db) = do
 		label <- mmpTryLabeled "$a"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$."
 		return (ctx, Database [] [(label, mapSymbols ctx ss, Axiom [])])
 
-mmpTheorem :: Context -> Parser (Context, Database)
-mmpTheorem ctx = do
+mmpTheorem :: (Context, Database) -> Parser (Context, Database)
+mmpTheorem (ctx, db) = do
 		label <- mmpTryLabeled "$p"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$="
@@ -158,11 +158,11 @@ mmpTheorem ctx = do
 		ps <- mmpIdentifiersThen "$."
 		return (ctx, Database [] [(label, mapSymbols ctx ss, Theorem [] ps)])
 
-mmpBlock :: Context -> Parser (Context, Database)
-mmpBlock ctx = do
+mmpBlock :: (Context, Database) -> Parser (Context, Database)
+mmpBlock (ctx, db) = do
 		mmpTryUnlabeled "${"
 		mmpSeparator
-		(ctx2, db2) <- mmpStatements ctx
+		(ctx2, db2) <- mmpStatements (ctx, db)
 		string "$}"
 		let Database inactiveStatements activeStatements = db2
 		let (nonAssertions, assertions) = statSplit activeStatements
