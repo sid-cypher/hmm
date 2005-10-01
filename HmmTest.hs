@@ -58,7 +58,7 @@ testCases =
 
 	,mmParseFromString "$c term $. $v x $. tx $a term x $." @?=
 		(ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x"
-		,Database [] [("tx", [Con "term", Var "x"], Axiom)]
+		,Database [] [("tx", [Con "term", Var "x"], Axiom [])]
 		)
 
 	,mmParseFromString (unlines
@@ -72,8 +72,8 @@ testCases =
 		,Database
 			[
 			]
-			[("ax-tx", [Con "term", Var "x"], Axiom)
-			,("th-tx", [Con "term", Var "x"], Theorem ["tx"])
+			[("ax-tx", [Con "term", Var "x"], Axiom [])
+			,("th-tx", [Con "term", Var "x"], Theorem [] ["tx"])
 			]
 		)
 
@@ -98,14 +98,14 @@ testCases =
 			,("min", [Con "|-", Var "P"], DollarE)
 			,("maj", [Con "|-", Con "(", Var "P", Con "->", Var "Q", Con ")"], DollarE)
 			]
-			[("mp", [Con "|-", Var "Q"], Axiom)
+			[("mp", [Con "|-", Var "Q"], Axiom [{-"min", "maj"-}])
 			]
 		)
 
 	],
 
 	"file-based tests" ~: test
-	[do {db <- mmParseFromFile "demo0.mm";db @=?
+	[do {db <- mmParseFromFile "demo0.mm"; db @=?
 		(ctxEmpty
 			`ctxWithConstants` ["0","+","=","->","(",")","term","wff","|-"]
 			`ctxWithVariables` ["t","r","s","P","Q"]
@@ -118,14 +118,14 @@ testCases =
 			,("ts",[Con "term",Var "s"],DollarF)
 			,("wp",[Con "wff",Var "P"],DollarF)
 			,("wq",[Con "wff",Var "Q"],DollarF)
-			,("tze",[Con "term",Con "0"],Axiom)
-			,("tpl",[Con "term",Con "(",Var "t",Con "+",Var "r",Con ")"],Axiom)
-			,("weq",[Con "wff",Var "t",Con "=",Var "r"],Axiom)
-			,("wim",[Con "wff",Con "(",Var "P",Con "->",Var "Q",Con ")"],Axiom)
-			,("a1",[Con "|-",Con "(",Var "t",Con "=",Var "r",Con "->",Con "(",Var "t",Con "=",Var "s",Con "->",Var "r",Con "=",Var "s",Con ")",Con ")"],Axiom)
-			,("a2",[Con "|-",Con "(",Var "t",Con "+",Con "0",Con ")",Con "=",Var "t"],Axiom)
-			,("mp",[Con "|-",Var "Q"],Axiom)
-			,("th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"])
+			,("tze",[Con "term",Con "0"],Axiom [])
+			,("tpl",[Con "term",Con "(",Var "t",Con "+",Var "r",Con ")"],Axiom [])
+			,("weq",[Con "wff",Var "t",Con "=",Var "r"],Axiom [])
+			,("wim",[Con "wff",Con "(",Var "P",Con "->",Var "Q",Con ")"],Axiom [])
+			,("a1",[Con "|-",Con "(",Var "t",Con "=",Var "r",Con "->",Con "(",Var "t",Con "=",Var "s",Con "->",Var "r",Con "=",Var "s",Con ")",Con ")"],Axiom [])
+			,("a2",[Con "|-",Con "(",Var "t",Con "+",Con "0",Con ")",Con "=",Var "t"],Axiom [])
+			,("mp",[Con "|-",Var "Q"],Axiom [])
+			,("th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem [] ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"])
 			]
 		)}
 	]

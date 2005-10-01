@@ -17,15 +17,11 @@ import Data.Char(isSpace,isAscii,isControl)
 
 
 data Database = Database [Statement] [Statement]
-	deriving Show
-
-instance Eq Database where
-	Database iss1 ass1 == Database iss2 ass2 =
-		sort iss1 == sort iss2 && sort ass1 == sort ass2
+	deriving (Eq, Show)
 
 type Statement = (String, [Symbol], StatementInfo)
 
-data StatementInfo = DollarE | DollarF | Axiom | Theorem [String]
+data StatementInfo = DollarE | DollarF | Axiom [String] | Theorem [String] [String]
 	deriving (Eq, Show, Ord)
 
 data Symbol = Var String | Con String
@@ -37,8 +33,8 @@ Database iss1 ass1 `dbWith` Database iss2 ass2 = Database (iss1++iss2) (ass1++as
 
 
 isAssertion :: Statement -> Bool
-isAssertion (_, _, Theorem _) = True
-isAssertion (_, _, Axiom) = True
+isAssertion (_, _, Theorem _ _) = True
+isAssertion (_, _, Axiom _) = True
 isAssertion _ = False
 
 
@@ -47,9 +43,9 @@ data Context = Context {ctxConstants::[String], ctxVariables::[String]}
 	deriving Show
 
 instance Eq Context where
-	d1 == d2 =
-		sort (ctxConstants d1) == sort (ctxConstants d2)
-		&& sort (ctxVariables d1) == sort (ctxVariables d2)
+	c1 == c2 =
+		sort (ctxConstants c1) == sort (ctxConstants c2)
+		&& sort (ctxVariables c1) == sort (ctxVariables c2)
 
 ctxEmpty = Context {ctxConstants = [], ctxVariables = []}
 
@@ -139,15 +135,19 @@ mmpDollarF :: Context -> Parser (Context, Database)
 mmpDollarF ctx = do
 		label <- mmpTryLabeled "$f"
 		mmpSeparator
-		ss <- mmpIdentifiersThen "$."
-		return (ctx, Database [] [(label, mapSymbols ctx ss, DollarF)])
+		c <- mmpIdentifier
+		mmpSeparator
+		v <- mmpIdentifier
+		mmpSeparator
+		string "$."
+		return (ctx, Database [] [(label, mapSymbols ctx [c, v], DollarF)])
 
 mmpAxiom :: Context -> Parser (Context, Database)
 mmpAxiom ctx = do
 		label <- mmpTryLabeled "$a"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$."
-		return (ctx, Database [] [(label, mapSymbols ctx ss, Axiom)])
+		return (ctx, Database [] [(label, mapSymbols ctx ss, Axiom [])])
 
 mmpTheorem :: Context -> Parser (Context, Database)
 mmpTheorem ctx = do
@@ -156,7 +156,7 @@ mmpTheorem ctx = do
 		ss <- mmpIdentifiersThen "$="
 		mmpSeparator
 		ps <- mmpIdentifiersThen "$."
-		return (ctx, Database [] [(label, mapSymbols ctx ss, Theorem ps)])
+		return (ctx, Database [] [(label, mapSymbols ctx ss, Theorem [] ps)])
 
 mmpBlock :: Context -> Parser (Context, Database)
 mmpBlock ctx = do
