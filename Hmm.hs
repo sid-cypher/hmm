@@ -5,7 +5,7 @@ module Hmm
 	,Statement
 	,StatementInfo(DollarE, DollarF, Axiom, Theorem)
 	,Symbol(Var,Con)
-	,mmParseFromString
+	,mmParseFromFile,mmParseFromString
 	)
 
 where
@@ -61,6 +61,10 @@ ctx `ctxWithVariables` vs = ctx {ctxVariables = vs ++ ctxVariables ctx}
 
 
 
+mmParseFromFile:: String -> IO (Context, Database)
+mmParseFromFile path = do
+		contents <- readFile path
+		return (mmParseFromString contents)
 
 mmParseFromString :: String -> (Context, Database)
 mmParseFromString s =
@@ -163,13 +167,13 @@ mmpBlock ctx = do
 		let Database inactiveStatements activeStatements = db2
 		let (nonAssertions, assertions) = statSplit activeStatements
 		return (ctx2, Database (inactiveStatements++nonAssertions) assertions)
-
-statSplit :: [Statement] -> ([Statement], [Statement])
-statSplit [] = ([],[])
-statSplit (stat:rest)
-	| isAssertion stat	= (restNonAssertions, stat:restAssertions)
-	| True			= (stat:restNonAssertions, restAssertions)
-	where (restNonAssertions, restAssertions) = statSplit rest
+	where
+		statSplit :: [Statement] -> ([Statement], [Statement])
+		statSplit [] = ([],[])
+		statSplit (stat:rest)
+			| isAssertion stat	= (restNonAssertions, stat:restAssertions)
+			| True			= (stat:restNonAssertions, restAssertions)
+			where (restNonAssertions, restAssertions) = statSplit rest
 
 mmpTryUnlabeled :: String -> Parser ()
 mmpTryUnlabeled keyword = (try (string keyword) >> return ()) <?> (keyword ++ " keyword")
