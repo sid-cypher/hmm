@@ -37,6 +37,31 @@ selectActive (Database ss) = [stat | (act, stat) <- ss, act]
 selectInactive :: Database -> [Statement]
 selectInactive (Database ss) = [stat | (act, stat) <- ss, not act]
 
+selectMandatoryLabelsForVarsOf :: [Symbol] -> Database -> [String]
+selectMandatoryLabelsForVarsOf symbols db@(Database ss) =
+	[label |
+		(act, (label, syms, info)) <- ss,
+		act,
+		case info of
+			DollarE -> True
+			DollarF -> let [Con c, Var v] = syms in
+				v `elem` (activeDollarEVars db ++ varsOf symbols)
+			_ -> False
+	]
+
+activeDollarEVars :: Database -> [String]
+activeDollarEVars (Database ss) =
+	concat [varsOf syms |
+		(act, (_, syms, info)) <- ss,
+		act,
+		info == DollarE
+	]
+
+varsOf :: [Symbol] -> [String]
+varsOf [] = []
+varsOf (Con c : rest) = varsOf rest
+varsOf (Var v : rest) = v : varsOf rest
+
 activeDollarE :: Database -> [String]
 activeDollarE db =
 	[label |
@@ -161,7 +186,8 @@ mmpAxiom (ctx, db) = do
 		label <- mmpTryLabeled "$a"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$."
-		return (ctx, Database [(True, (label, mapSymbols ctx ss, Axiom (activeDollarE db)))])
+		let symbols = mapSymbols ctx ss
+		return (ctx, Database [(True, (label, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db)))])
 
 mmpTheorem :: (Context, Database) -> Parser (Context, Database)
 mmpTheorem (ctx, db) = do
