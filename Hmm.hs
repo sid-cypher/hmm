@@ -196,7 +196,8 @@ mmpTheorem (ctx, db) = do
 		ss <- mmpIdentifiersThen "$="
 		mmpSeparator
 		ps <- mmpIdentifiersThen "$."
-		return (ctx, Database [(True, (label, mapSymbols ctx ss, Theorem [] ps))])
+		let symbols = mapSymbols ctx ss
+		return (ctx, Database [(True, (label, symbols, Theorem (selectMandatoryLabelsForVarsOf symbols db) ps))])
 
 mmpBlock :: (Context, Database) -> Parser (Context, Database)
 mmpBlock (ctx, db) = do

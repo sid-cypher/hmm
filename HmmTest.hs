@@ -149,7 +149,7 @@ testCases =
 			,(False, ("min",[Con "|-",Var "P"],DollarE))
 			,(False, ("maj",[Con "|-",Con "(",Var "P",Con "->",Var "Q",Con ")"],DollarE))
 			,(True, ("mp",[Con "|-",Var "Q"],Axiom ["wp", "wq", "min", "maj"]))
-			,(True, ("th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem [] ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"]))
+			,(True, ("th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem ["tt"] ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"]))
 			]
 		)}
 	]
