@@ -16,7 +16,7 @@ import Data.Char(isSpace,isAscii,isControl)
 
 
 
-data Database = Database [Statement] [Statement]
+data Database = Database [(Bool, Statement)]
 	deriving (Eq, Show)
 
 type Statement = (String, [Symbol], StatementInfo)
@@ -27,14 +27,20 @@ data StatementInfo = DollarE | DollarF | Axiom [String] | Theorem [String] [Stri
 data Symbol = Var String | Con String
 	deriving (Eq, Show, Ord)
 
-dbEmpty = Database [] []
+dbEmpty = Database []
 
-Database iss1 ass1 `dbWith` Database iss2 ass2 = Database (iss1++iss2) (ass1++ass2)
+Database ss1 `dbWith` Database ss2 = Database (ss1++ss2)
+
+selectActive :: Database -> [Statement]
+selectActive (Database ss) = [stat | (act, stat) <- ss, act]
+
+selectInactive :: Database -> [Statement]
+selectInactive (Database ss) = [stat | (act, stat) <- ss, not act]
 
 activeDollarE :: Database -> [String]
-activeDollarE (Database _ activeStatements) =
+activeDollarE db =
 	[label |
-		(label, _, info) <- activeStatements,
+		(label, _, info) <- selectActive db,
 		case info of {DollarE -> True; _ -> False}
 	]
 
@@ -137,7 +143,7 @@ mmpDollarE (ctx, db) = do
 		label <- mmpTryLabeled "$e"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$."
-		return (ctx, Database [] [(label, mapSymbols ctx ss, DollarE)])
+		return (ctx, Database [(True, (label, mapSymbols ctx ss, DollarE))])
 
 mmpDollarF :: (Context, Database) -> Parser (Context, Database)
 mmpDollarF (ctx, db) = do
@@ -148,14 +154,14 @@ mmpDollarF (ctx, db) = do
 		v <- mmpIdentifier
 		mmpSeparator
 		string "$."
-		return (ctx, Database [] [(label, mapSymbols ctx [c, v], DollarF)])
+		return (ctx, Database [(True, (label, mapSymbols ctx [c, v], DollarF))])
 
 mmpAxiom :: (Context, Database) -> Parser (Context, Database)
 mmpAxiom (ctx, db) = do
 		label <- mmpTryLabeled "$a"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$."
-		return (ctx, Database [] [(label, mapSymbols ctx ss, Axiom (activeDollarE db))])
+		return (ctx, Database [(True, (label, mapSymbols ctx ss, Axiom (activeDollarE db)))])
 
 mmpTheorem :: (Context, Database) -> Parser (Context, Database)
 mmpTheorem (ctx, db) = do
@@ -164,7 +170,7 @@ mmpTheorem (ctx, db) = do
 		ss <- mmpIdentifiersThen "$="
 		mmpSeparator
 		ps <- mmpIdentifiersThen "$."
-		return (ctx, Database [] [(label, mapSymbols ctx ss, Theorem [] ps)])
+		return (ctx, Database [(True, (label, mapSymbols ctx ss, Theorem [] ps))])
 
 mmpBlock :: (Context, Database) -> Parser (Context, Database)
 mmpBlock (ctx, db) = do
@@ -172,16 +178,11 @@ mmpBlock (ctx, db) = do
 		mmpSeparator
 		(ctx2, db2) <- mmpStatements (ctx, db)
 		string "$}"
-		let Database inactiveStatements activeStatements = db2
-		let (nonAssertions, assertions) = statSplit activeStatements
-		return (ctx2, Database (inactiveStatements++nonAssertions) assertions)
+		return (ctx2, deactivateNonAssertions db2)
 	where
-		statSplit :: [Statement] -> ([Statement], [Statement])
-		statSplit [] = ([],[])
-		statSplit (stat:rest)
-			| isAssertion stat	= (restNonAssertions, stat:restAssertions)
-			| True			= (stat:restNonAssertions, restAssertions)
-			where (restNonAssertions, restAssertions) = statSplit rest
+		deactivateNonAssertions :: Database -> Database
+		deactivateNonAssertions (Database ss) =
+			Database [(newact, stat) | (act, stat) <- ss, let newact = if isAssertion stat then act else False]
 
 mmpTryUnlabeled :: String -> Parser ()
 mmpTryUnlabeled keyword = (try (string keyword) >> return ()) <?> (keyword ++ " keyword")
