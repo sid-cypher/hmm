@@ -27,24 +27,21 @@ data StatementInfo = DollarE | DollarF | Axiom [String] | Theorem [String] [Stri
 data Symbol = Var String | Con String
 	deriving (Eq, Show, Ord)
 
+dbEmpty :: Database
 dbEmpty = Database []
 
+dbWith:: Database -> Database -> Database
 Database ss1 `dbWith` Database ss2 = Database (ss1++ss2)
 
-selectActive :: Database -> [Statement]
-selectActive (Database ss) = [stat | (act, stat) <- ss, act]
-
-selectInactive :: Database -> [Statement]
-selectInactive (Database ss) = [stat | (act, stat) <- ss, not act]
 
 selectMandatoryLabelsForVarsOf :: [Symbol] -> Database -> [String]
 selectMandatoryLabelsForVarsOf symbols db@(Database ss) =
-	[label |
-		(act, (label, syms, info)) <- ss,
+	[lab |
+		(act, (lab, syms, info)) <- ss,
 		act,
 		case info of
 			DollarE -> True
-			DollarF -> let [Con c, Var v] = syms in
+			DollarF -> let [Con _c, Var v] = syms in
 				v `elem` (activeDollarEVars db ++ varsOf symbols)
 			_ -> False
 	]
@@ -59,15 +56,8 @@ activeDollarEVars (Database ss) =
 
 varsOf :: [Symbol] -> [String]
 varsOf [] = []
-varsOf (Con c : rest) = varsOf rest
 varsOf (Var v : rest) = v : varsOf rest
-
-activeDollarE :: Database -> [String]
-activeDollarE db =
-	[label |
-		(label, _, info) <- selectActive db,
-		case info of {DollarE -> True; _ -> False}
-	]
+varsOf (Con _c : rest) = varsOf rest
 
 
 isAssertion :: Statement -> Bool
@@ -85,10 +75,13 @@ instance Eq Context where
 		sort (ctxConstants c1) == sort (ctxConstants c2)
 		&& sort (ctxVariables c1) == sort (ctxVariables c2)
 
+ctxEmpty :: Context
 ctxEmpty = Context {ctxConstants = [], ctxVariables = []}
 
+ctxWithConstants :: Context -> [String] -> Context
 ctx `ctxWithConstants` cs = ctx {ctxConstants = cs ++ ctxConstants ctx}
 
+ctxWithVariables :: Context -> [String] -> Context
 ctx `ctxWithVariables` vs = ctx {ctxVariables = vs ++ ctxVariables ctx}
 
 
@@ -164,40 +157,40 @@ mmpVariables (ctx, db) = do
 		return (ctx `ctxWithVariables` cs, db)
 
 mmpDollarE :: (Context, Database) -> Parser (Context, Database)
-mmpDollarE (ctx, db) = do
-		label <- mmpTryLabeled "$e"
+mmpDollarE (ctx, _db) = do
+		lab <- mmpTryLabeled "$e"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$."
-		return (ctx, Database [(True, (label, mapSymbols ctx ss, DollarE))])
+		return (ctx, Database [(True, (lab, mapSymbols ctx ss, DollarE))])
 
 mmpDollarF :: (Context, Database) -> Parser (Context, Database)
-mmpDollarF (ctx, db) = do
-		label <- mmpTryLabeled "$f"
+mmpDollarF (ctx, _db) = do
+		lab <- mmpTryLabeled "$f"
 		mmpSeparator
 		c <- mmpIdentifier
 		mmpSeparator
 		v <- mmpIdentifier
 		mmpSeparator
 		string "$."
-		return (ctx, Database [(True, (label, mapSymbols ctx [c, v], DollarF))])
+		return (ctx, Database [(True, (lab, mapSymbols ctx [c, v], DollarF))])
 
 mmpAxiom :: (Context, Database) -> Parser (Context, Database)
 mmpAxiom (ctx, db) = do
-		label <- mmpTryLabeled "$a"
+		lab <- mmpTryLabeled "$a"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$."
 		let symbols = mapSymbols ctx ss
-		return (ctx, Database [(True, (label, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db)))])
+		return (ctx, Database [(True, (lab, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db)))])
 
 mmpTheorem :: (Context, Database) -> Parser (Context, Database)
 mmpTheorem (ctx, db) = do
-		label <- mmpTryLabeled "$p"
+		lab <- mmpTryLabeled "$p"
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$="
 		mmpSeparator
 		ps <- mmpIdentifiersThen "$."
 		let symbols = mapSymbols ctx ss
-		return (ctx, Database [(True, (label, symbols, Theorem (selectMandatoryLabelsForVarsOf symbols db) ps))])
+		return (ctx, Database [(True, (lab, symbols, Theorem (selectMandatoryLabelsForVarsOf symbols db) ps))])
 
 mmpBlock :: (Context, Database) -> Parser (Context, Database)
 mmpBlock (ctx, db) = do
@@ -216,10 +209,10 @@ mmpTryUnlabeled keyword = (try (string keyword) >> return ()) <?> (keyword ++ " 
 
 mmpTryLabeled :: String -> Parser String
 mmpTryLabeled keyword = (try $ do
-				label <- mmpIdentifier
+				lab <- mmpIdentifier
 				mmpSeparator
 				string keyword
-				return label
+				return lab
 			) <?> ("labeled " ++ keyword ++ " keyword")
 
 mmpIdentifiersThen :: String -> Parser [String]

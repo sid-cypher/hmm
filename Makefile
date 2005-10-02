@@ -1,7 +1,7 @@
 default: check
 
 hmmTest: *.hs
-	ghc -o hmmTest --make HmmTest
+	ghc -Wall -Werror -o hmmTest --make HmmTest
 
 clean:
 	rm -f *.o *.hi hmmTest

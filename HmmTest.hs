@@ -156,5 +156,9 @@ testCases =
 
 	]
 
+
+ctxWithConstant :: Context -> String -> Context
 ctx `ctxWithConstant` c = ctx `ctxWithConstants` [c]
+
+ctxWithVariable :: Context -> String -> Context
 ctx `ctxWithVariable` v = ctx `ctxWithVariables` [v]
