@@ -159,6 +159,7 @@ testCases =
 	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmComputeTheorem db ["tt", "tze", "tpl"] @?=
 		Just [Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"]}
 	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesLabel db "th1" @?= True}
+	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesDatabase db @?= True}
 	]
 
 	]

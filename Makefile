@@ -1,10 +1,11 @@
 default: check
 
-hmmTest: *.hs
+hmmTest.exe hmmverify.exe: *.hs
 	ghc -Wall -Werror -o hmmTest --make HmmTest
+	ghc -Wall -Werror -o hmmverify --make HmmVerify
 
 clean:
-	rm -f *.o *.hi hmmTest
+	rm -f *.o *.hi hmmTest.exe hmmverify.exe
 
-check: hmmTest
-	./hmmTest
+check: hmmTest.exe
+	./hmmTest.exe

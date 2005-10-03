@@ -7,7 +7,7 @@ module Hmm
 	,Symbol(Var,Con)
 	,findStatement
 	,mmParseFromFile,mmParseFromString
-	,mmComputeTheorem,mmVerifiesLabel
+	,mmComputeTheorem,mmVerifiesProof,mmVerifiesLabel,mmVerifiesDatabase
 	)
 
 where
@@ -278,13 +278,21 @@ applySubstitution subst (Var v : rest) =
 
 
 mmVerifiesLabel :: Database -> String -> Bool
-mmVerifiesLabel db lab = mmVerifiesStat db proof
+mmVerifiesLabel db lab = mmVerifiesProof db proof
 	where
 		stat = findStatement db lab
 		(_, _, _, Theorem _ proof) = stat
 
-mmVerifiesStat :: Database -> [String] -> Bool
-mmVerifiesStat db proof = case mmComputeTheorem db proof of Just _ -> True; Nothing -> False
+mmVerifiesProof :: Database -> [String] -> Bool
+mmVerifiesProof db proof = case mmComputeTheorem db proof of Just _ -> True; Nothing -> False
+
+mmVerifiesDatabase :: Database -> Bool
+mmVerifiesDatabase db@(Database stats) = all (mmVerifiesProof db) (selectProofs stats)
+	where
+		selectProofs :: [Statement] -> [[String]]
+		selectProofs [] = []
+		selectProofs ((_, _, _, Theorem _ proof):rest) = proof : selectProofs rest
+		selectProofs (_:rest) = selectProofs rest
 
 findStatement :: Database -> String -> Statement
 findStatement (Database []) lab = error $ "statement labeled " ++ lab ++ " not found"
