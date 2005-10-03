@@ -5,7 +5,9 @@ module Hmm
 	,Statement
 	,StatementInfo(DollarE, DollarF, Axiom, Theorem)
 	,Symbol(Var,Con)
+	,findStatement
 	,mmParseFromFile,mmParseFromString
+	,mmComputeTheorem,mmVerifiesLabel
 	)
 
 where
@@ -233,3 +235,67 @@ mapSymbols ctx = map $ \s ->
 			if s `elem` ctxConstants ctx then Con s
 			else if s `elem` ctxVariables ctx then Var s
 			else error ("Unknown math symbol " ++ s)
+
+
+mmComputeTheorem :: Database -> [String] -> Maybe [Symbol]
+mmComputeTheorem db labs = case mmComputeTheoremStack db labs [] of [th] -> Just th; _ -> Nothing
+
+mmComputeTheoremStack :: Database -> [String] -> [[Symbol]] -> [[Symbol]]
+mmComputeTheoremStack _ [] stack = stack
+mmComputeTheoremStack db (lab:labs) stack =
+		mmComputeTheoremStack db labs (newSyms:poppedStack)
+	where
+		stat = findStatement db lab
+		(_, _, syms, _) = stat
+		hyps = getHypotheses stat
+		nHyps = length hyps
+		poppedStack = drop nHyps stack
+		subst = case unify (zip (map (findSymbols db) hyps) (reverse (take nHyps stack))) of
+			Just s -> s
+			Nothing -> error "could not unify"
+		newSyms = applySubstitution subst syms
+
+
+type Substitution = [(String, [Symbol])]
+
+unify :: [([Symbol], [Symbol])] -> Maybe Substitution
+unify tuples = unify' tuples []
+
+unify' :: [([Symbol], [Symbol])] -> Substitution -> Maybe Substitution
+unify' [] subst = Just subst
+unify' (([Con c1, Var v], Con c2 : syms):tuples) subst | c1 == c2 && lookup v subst == Nothing =
+	unify' tuples ((v, syms) : subst)
+unify' ((fromSyms, toSyms) : tuples) subst | applySubstitution subst fromSyms == toSyms =
+	unify' tuples subst
+unify' _ _ = Nothing
+
+applySubstitution :: Substitution -> [Symbol] -> [Symbol]
+applySubstitution _ [] = []
+applySubstitution subst (Con c : rest) = Con c : applySubstitution subst rest
+applySubstitution subst (Var v : rest) =
+	(case lookup v subst of Just ss -> ss; Nothing -> [Var v])
+	++ applySubstitution subst rest
+
+
+mmVerifiesLabel :: Database -> String -> Bool
+mmVerifiesLabel db lab = mmVerifiesStat db proof
+	where
+		stat = findStatement db lab
+		(_, _, _, Theorem _ proof) = stat
+
+mmVerifiesStat :: Database -> [String] -> Bool
+mmVerifiesStat db proof = case mmComputeTheorem db proof of Just _ -> True; Nothing -> False
+
+findStatement :: Database -> String -> Statement
+findStatement (Database []) lab = error $ "statement labeled " ++ lab ++ " not found"
+findStatement (Database (stat@(_, lab2, _, _):rest)) lab
+	| lab == lab2	= stat
+	| True		= findStatement (Database rest) lab
+
+findSymbols :: Database -> String -> [Symbol]
+findSymbols db lab = syms where (_, _, syms, _) = findStatement db lab
+
+getHypotheses :: Statement -> [String]
+getHypotheses (_, _, _, Axiom hyp) = hyp
+getHypotheses (_, _, _, Theorem hyp _) = hyp
+getHypotheses _ = []

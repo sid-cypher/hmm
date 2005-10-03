@@ -61,6 +61,9 @@ testCases =
 		,Database [(True, "tx", [Con "term", Var "x"], Axiom [])]
 		)
 
+	,findStatement (snd (mmParseFromString "$c term $. $v x $. tx $a term x $.")) "tx" @?=
+		(True, "tx", [Con "term", Var "x"], Axiom [])
+
 	,mmParseFromString (unlines
 		["$c term $."
 		,"$v x $."
@@ -152,6 +155,10 @@ testCases =
 			,(True, "th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem ["tt"] ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"])
 			]
 		)}
+	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmComputeTheorem db ["tt"] @?= Just [Con "term", Var "t"]}
+	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmComputeTheorem db ["tt", "tze", "tpl"] @?=
+		Just [Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"]}
+	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesLabel db "th1" @?= True}
 	]
 
 	]
