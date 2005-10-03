@@ -1,11 +1,13 @@
+EXE=
+
 default: check
 
-hmmTest.exe hmmverify.exe: *.hs
+hmmTest$(EXE) hmmverify$(EXE): *.hs
 	ghc -Wall -Werror -o hmmTest --make HmmTest
 	ghc -Wall -Werror -o hmmverify --make HmmVerify
 
 clean:
-	rm -f *.o *.hi hmmTest.exe hmmverify.exe
+	rm -f *.o *.hi hmmTest$(EXE) hmmverify$(EXE)
 
-check: hmmTest.exe
-	./hmmTest.exe
+check: hmmTest$(EXE)
+	./hmmTest$(EXE)
