@@ -125,6 +125,7 @@ mmpStatement :: (Context, Database) -> Parser (Context, Database)
 mmpStatement (ctx, db) =
 		(   mmpConstants (ctx, db)
 		<|> mmpVariables (ctx, db)
+		<|> mmpRestrictions (ctx, db)
 		<|> mmpDollarE (ctx, db)
 		<|> mmpDollarF (ctx, db)
 		<|> mmpAxiom (ctx, db)
@@ -157,6 +158,14 @@ mmpVariables (ctx, db) = do
 		mmpSeparator
 		cs <- mmpIdentifiersThen "$."
 		return (ctx `ctxWithVariables` cs, db)
+
+mmpRestrictions :: (Context, Database) -> Parser (Context, Database)
+mmpRestrictions (ctx, db) = do
+		mmpTryUnlabeled "$d"
+		mmpSeparator
+		_ <- mmpIdentifiersThen "$."
+		--TODO: Do something with this info!
+		return (ctx, db)
 
 mmpDollarE :: (Context, Database) -> Parser (Context, Database)
 mmpDollarE (ctx, _db) = do
