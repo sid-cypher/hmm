@@ -224,7 +224,7 @@ mmpTryUnlabeled keyword = (try (string keyword) >> return ()) <?> (keyword ++ " 
 
 mmpTryLabeled :: String -> Parser String
 mmpTryLabeled keyword = (try $ do
-				lab <- mmpIdentifier
+				lab <- mmpLabel
 				mmpSeparator
 				string keyword
 				return lab
@@ -235,6 +235,9 @@ mmpIdentifiersThen end = manyTill (do {s<-mmpIdentifier; mmpSeparator; return s}
 
 mmpIdentifier :: Parser String
 mmpIdentifier = many1 (satisfy isMathSymbolChar) <?> "math symbol"
+
+mmpLabel :: Parser String
+mmpLabel = many1 (alphaNum <|> oneOf "-_.")
 
 isMathSymbolChar :: Char -> Bool
 isMathSymbolChar c = isAscii c && not (isSpace c) && not (isControl c)
