@@ -199,9 +199,19 @@ mmpTheorem (ctx, db) = do
 		mmpSeparator
 		ss <- mmpIdentifiersThen "$="
 		mmpSeparator
-		ps <- mmpIdentifiersThen "$."
+		ps <- (mmpUncompressedProof <|> mmpCompressedProof)
 		let symbols = mapSymbols ctx ss
 		return (ctx, Database [(True, lab, symbols, Theorem (selectMandatoryLabelsForVarsOf symbols db) ps)])
+
+mmpUncompressedProof :: Parser [String]
+mmpUncompressedProof = do
+		manyTill (do {s<-mmpLabel; mmpSeparator; return s}) (try (string "$."))
+
+mmpCompressedProof :: Parser [String]
+mmpCompressedProof = do
+		string "("
+		mmpSeparator
+		error "TODO: not yet implemented"
 
 mmpBlock :: (Context, Database) -> Parser (Context, Database)
 mmpBlock (ctx, db) = do
