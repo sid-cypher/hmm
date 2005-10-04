@@ -260,22 +260,29 @@ mapSymbols ctx = map $ \s ->
 
 
 mmComputeTheorem :: Database -> [String] -> Maybe [Symbol]
-mmComputeTheorem db labs = case mmComputeTheoremStack db labs [] of [th] -> Just th; _ -> Nothing
+mmComputeTheorem db labs = case computeStack db labs combine of [th] -> Just th; _ -> Nothing
+	where
+		combine :: Statement -> [(String, [Symbol])] -> [Symbol]
+		combine stat labSymsList = newSyms
+			where
+				(_, _, syms, _) = stat
+				subst = case unify (map (\(lab, ss) -> (findSymbols db lab, ss)) labSymsList) of
+					Just s -> s
+					Nothing -> error "could not unify"
+				newSyms = applySubstitution subst syms
 
-mmComputeTheoremStack :: Database -> [String] -> [[Symbol]] -> [[Symbol]]
-mmComputeTheoremStack _ [] stack = stack
-mmComputeTheoremStack db (lab:labs) stack =
-		mmComputeTheoremStack db labs (newSyms:poppedStack)
+computeStack :: Database -> [String] -> (Statement -> [(String, a)] -> a) -> [a]
+computeStack db labs f = computeStack' db labs f []
+
+computeStack' :: Database -> [String] -> (Statement -> [(String, a)] -> a) -> [a] -> [a]
+computeStack' _ [] _ stack = stack
+computeStack' db (lab:labs) combine stack = computeStack' db labs combine (newTop:poppedStack)
 	where
 		stat = findStatement db lab
-		(_, _, syms, _) = stat
 		hyps = getHypotheses stat
 		nHyps = length hyps
 		poppedStack = drop nHyps stack
-		subst = case unify (zip (map (findSymbols db) hyps) (reverse (take nHyps stack))) of
-			Just s -> s
-			Nothing -> error "could not unify"
-		newSyms = applySubstitution subst syms
+		newTop = combine stat (zip hyps (reverse (take nHyps stack)))
 
 
 type Substitution = [(String, [Symbol])]
