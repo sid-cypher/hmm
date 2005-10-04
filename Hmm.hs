@@ -149,21 +149,21 @@ mmpConstants :: (Context, Database) -> Parser (Context, Database)
 mmpConstants (ctx, db) = do
 		mmpTryUnlabeled "$c"
 		mmpSeparator
-		cs <- mmpIdentifiersThen "$."
+		cs <- mmpSepListEndBy mmpIdentifier "$."
 		return (ctx `ctxWithConstants` cs, db)
 
 mmpVariables :: (Context, Database) -> Parser (Context, Database)
 mmpVariables (ctx, db) = do
 		mmpTryUnlabeled "$v"
 		mmpSeparator
-		cs <- mmpIdentifiersThen "$."
+		cs <- mmpSepListEndBy mmpIdentifier "$."
 		return (ctx `ctxWithVariables` cs, db)
 
 mmpRestrictions :: (Context, Database) -> Parser (Context, Database)
 mmpRestrictions (ctx, db) = do
 		mmpTryUnlabeled "$d"
 		mmpSeparator
-		_ <- mmpIdentifiersThen "$."
+		_ <- mmpSepListEndBy mmpIdentifier "$."
 		--TODO: Do something with this info!
 		return (ctx, db)
 
@@ -171,7 +171,7 @@ mmpDollarE :: (Context, Database) -> Parser (Context, Database)
 mmpDollarE (ctx, _db) = do
 		lab <- mmpTryLabeled "$e"
 		mmpSeparator
-		ss <- mmpIdentifiersThen "$."
+		ss <- mmpSepListEndBy mmpIdentifier "$."
 		return (ctx, Database [(True, lab, mapSymbols ctx ss, DollarE)])
 
 mmpDollarF :: (Context, Database) -> Parser (Context, Database)
@@ -189,7 +189,7 @@ mmpAxiom :: (Context, Database) -> Parser (Context, Database)
 mmpAxiom (ctx, db) = do
 		lab <- mmpTryLabeled "$a"
 		mmpSeparator
-		ss <- mmpIdentifiersThen "$."
+		ss <- mmpSepListEndBy mmpIdentifier "$."
 		let symbols = mapSymbols ctx ss
 		return (ctx, Database [(True, lab, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db))])
 
@@ -197,7 +197,7 @@ mmpTheorem :: (Context, Database) -> Parser (Context, Database)
 mmpTheorem (ctx, db) = do
 		lab <- mmpTryLabeled "$p"
 		mmpSeparator
-		ss <- mmpIdentifiersThen "$="
+		ss <- mmpSepListEndBy mmpIdentifier "$="
 		mmpSeparator
 		ps <- (mmpUncompressedProof <|> mmpCompressedProof)
 		let symbols = mapSymbols ctx ss
@@ -205,7 +205,7 @@ mmpTheorem (ctx, db) = do
 
 mmpUncompressedProof :: Parser [String]
 mmpUncompressedProof = do
-		manyTill (do {s<-mmpLabel; mmpSeparator; return s}) (try (string "$."))
+		mmpSepListEndBy mmpLabel "$."
 
 mmpCompressedProof :: Parser [String]
 mmpCompressedProof = do
@@ -240,8 +240,8 @@ mmpTryLabeled keyword = (try $ do
 				return lab
 			) <?> ("labeled " ++ keyword ++ " keyword")
 
-mmpIdentifiersThen :: String -> Parser [String]
-mmpIdentifiersThen end = manyTill (do {s<-mmpIdentifier; mmpSeparator; return s}) (try (string end))
+mmpSepListEndBy :: Parser a -> String -> Parser [a]
+mmpSepListEndBy p end = manyTill (do {s <- p; mmpSeparator; return s}) (try (string end))
 
 mmpIdentifier :: Parser String
 mmpIdentifier = many1 (satisfy isMathSymbolChar) <?> "math symbol"
