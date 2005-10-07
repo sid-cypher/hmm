@@ -5,6 +5,8 @@ import Hmm
 import Test.HUnit.Base
 import Test.HUnit.Text
 
+import Text.ParserCombinators.Parsec
+
 main :: IO ()
 main = do
 	 _ <- runTestTT testCases
@@ -130,6 +132,13 @@ testCases =
 			]
 		)
 
+	--TODO: also support spaces in compressed proofs
+	,(case parse mmpCompressedNumbers "<test string>" "AAABZBFAACAFAAFCDE" of Left _ -> Nothing; Right l -> Just l)
+		@?= Just
+		[(0,False),(0,False),(0,False),(1,True ),(1,False)
+		,(5,False),(0,False),(0,False),(2,False),(0,False)
+		,(5,False),(0,False),(0,False),(5,False),(2,False)
+		,(3,False),(4,False)]
 	],
 
 	"file-based tests" ~: test
@@ -160,6 +169,22 @@ testCases =
 		Just [Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"]}
 	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesLabel db "th1" @?= True}
 	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesDatabase db @?= True}
+
+	,do {(_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesLabel db "a1i" @?= True}
+	,do {(_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesLabel db "a2i" @?= True}
+	,do
+		(_, db) <- mmParseFromFile "set-part.mm"
+		let (_, _, _, Theorem _ proof) = findStatement db "id"
+		proof @?=
+			["wph","wph","wph","wi","wi"
+			,"wph","wph","wi"
+			,"wph","wph","ax-1","wph"
+			,"wph","wph","wi"
+			,"wph","wph"
+			,"wph","wph","wi"
+			,"ax-1","a2i","ax-mp"
+			]
+	,do {(_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesDatabase db @?= True}
 	]
 
 	]

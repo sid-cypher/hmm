@@ -8,6 +8,8 @@ module Hmm
 	,findStatement
 	,mmParseFromFile,mmParseFromString
 	,mmComputeTheorem,mmVerifiesProof,mmVerifiesLabel,mmVerifiesDatabase
+
+	,mmpCompressedNumbers
 	)
 
 where
@@ -202,19 +204,85 @@ mmpTheorem (ctx, db) = do
 		mmpSeparator
 		ss <- mmpSepListEndBy mmpIdentifier "$="
 		mmpSeparator
-		ps <- (mmpUncompressedProof <|> mmpCompressedProof)
 		let symbols = mapSymbols ctx ss
-		return (ctx, Database [(True, lab, symbols, Theorem (selectMandatoryLabelsForVarsOf symbols db) ps)])
+		let mandatoryLabels = selectMandatoryLabelsForVarsOf symbols db
+		ps <- (mmpUncompressedProof <|> mmpCompressedProof db mandatoryLabels)
+		return (ctx, Database [(True, lab, symbols, Theorem mandatoryLabels ps)])
 
 mmpUncompressedProof :: Parser [String]
 mmpUncompressedProof = do
 		mmpSepListEndBy mmpLabel "$."
 
-mmpCompressedProof :: Parser [String]
-mmpCompressedProof = do
+mmpCompressedProof :: Database -> [String] -> Parser [String]
+mmpCompressedProof db mandatoryLabels = do
 		string "("
 		mmpSeparator
-		error "TODO: not yet implemented"
+		assertionLabels <- mmpSepListEndBy mmpLabel ")"
+		mmpSeparator
+		markedNumbers <- mmpCompressedNumbers
+		mmpSeparator
+		string "$."
+		return (createProof assertionLabels markedNumbers)
+	where
+		createProof :: [String] -> [(Int,Bool)] -> [String]
+		createProof assertionLabels markedNumbers = proof
+			where
+				proof :: Proof
+				proof = proof' markedNumbers ([], [], [])
+
+				-- The meaning of the accumulated arguments:
+				-- marked: the 1st, 2nd, ... marked subproofs
+				-- subs:   the subproofs ending at the 1st, 2nd, ... number in the list
+				-- p:      the proof resulting from all markedNumbers processed so far
+				proof' :: [(Int, Bool)] -> ([Proof], [Proof], Proof) -> Proof
+				proof' [] (_, _, p) = p
+				proof' ((n, mark):rest) (marked, subs, p) = proof' rest (newMarked, newSubs, newP)
+					where
+						-- meaning !! n =
+						--	(the subproof associated with number n
+						--	,the number of proof steps that it pops from the proof stack
+						--	)
+						meaning :: [(Proof, Int)]
+						meaning =
+							map (\lab -> ([lab], 0)) mandatoryLabels
+							++ map (\lab -> ([lab], length (getHypotheses (findStatement db lab))))
+								assertionLabels
+							++ zip marked (repeat 0)
+
+						newSteps :: Proof
+						newSteps = fst (meaning !! n)
+
+						newSub :: Proof
+						newSub = concat ((reverse . take (snd (meaning !! n)) . reverse) subs)
+							++ newSteps
+
+						newMarked :: [Proof]
+						newMarked = if mark then marked ++ [newSub] else marked
+
+						newSubs :: [Proof]
+						newSubs = subs ++ [newSub]
+
+						newP :: Proof
+						newP = p ++ newSteps
+
+mmpCompressedNumbers :: Parser [(Int, Bool)]
+mmpCompressedNumbers = many1 (do
+		--try mmpSeparator <|> return ()
+		n <- mmpCompressedNumber
+		marked <- (try (oneOf "Z") >> return True) <|> return False
+		return (n, marked)
+		)
+
+mmpCompressedNumber :: Parser Int
+mmpCompressedNumber = do
+		base20 <- many (do
+			c <- satisfy (\c -> 'U' <= c && c <= 'Y')
+			return (fromEnum c - fromEnum 'U')
+			)
+		base5 <- do
+			c <- satisfy (\c -> 'A' <= c && c <= 'T')
+			return (fromEnum c - fromEnum 'A')
+		return (foldr (\x y -> x * 20 + y) base5 base20)
 
 mmpBlock :: (Context, Database) -> Parser (Context, Database)
 mmpBlock (ctx, db) = do
