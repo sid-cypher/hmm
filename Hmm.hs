@@ -93,11 +93,14 @@ ctx `ctxWithVariables` vs = ctx {ctxVariables = vs ++ ctxVariables ctx}
 mmParseFromFile:: String -> IO (Context, Database)
 mmParseFromFile path = do
 		contents <- readFile path
-		return (mmParseFromString contents)
+		return (mmParse path contents)
 
 mmParseFromString :: String -> (Context, Database)
-mmParseFromString s =
-	case parse mmpDatabase "<string>" s of
+mmParseFromString s = mmParse "<string>" s
+
+mmParse :: String -> String -> (Context, Database)
+mmParse source s =
+	case parse mmpDatabase source s of
 		Left err -> error $ show err
 		Right result -> result
 
