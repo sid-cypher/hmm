@@ -23,13 +23,17 @@ import Data.Char(isSpace,isAscii,isControl)
 data Database = Database [Statement]
 	deriving (Eq, Show)
 
-type Statement = (Bool, String, [Symbol], StatementInfo)
+type Statement = (Bool, Label, Expression, StatementInfo)
 
-data StatementInfo = DollarE | DollarF | Axiom [String] | Theorem [String] [String]
+data StatementInfo = DollarE | DollarF | Axiom [Label] | Theorem [Label] Proof
 	deriving (Eq, Show, Ord)
 
 data Symbol = Var String | Con String
 	deriving (Eq, Show, Ord)
+
+type Expression = [Symbol]
+type Label = String
+type Proof = [String]
 
 dbEmpty :: Database
 dbEmpty = Database []
@@ -38,7 +42,7 @@ dbWith:: Database -> Database -> Database
 Database ss1 `dbWith` Database ss2 = Database (ss1++ss2)
 
 
-selectMandatoryLabelsForVarsOf :: [Symbol] -> Database -> [String]
+selectMandatoryLabelsForVarsOf :: Expression -> Database -> [Label]
 selectMandatoryLabelsForVarsOf symbols db@(Database ss) =
 	[lab |
 		(act, lab, syms, info) <- ss,
@@ -58,7 +62,7 @@ activeDollarEVars (Database ss) =
 		info == DollarE
 	]
 
-varsOf :: [Symbol] -> [String]
+varsOf :: Expression -> [String]
 varsOf [] = []
 varsOf (Var v : rest) = v : varsOf rest
 varsOf (Con _c : rest) = varsOf rest
@@ -209,11 +213,11 @@ mmpTheorem (ctx, db) = do
 		ps <- (mmpUncompressedProof <|> mmpCompressedProof db mandatoryLabels)
 		return (ctx, Database [(True, lab, symbols, Theorem mandatoryLabels ps)])
 
-mmpUncompressedProof :: Parser [String]
+mmpUncompressedProof :: Parser Proof
 mmpUncompressedProof = do
 		mmpSepListEndBy mmpLabel "$."
 
-mmpCompressedProof :: Database -> [String] -> Parser [String]
+mmpCompressedProof :: Database -> [Label] -> Parser Proof
 mmpCompressedProof db mandatoryLabels = do
 		string "("
 		mmpSeparator
@@ -224,7 +228,7 @@ mmpCompressedProof db mandatoryLabels = do
 		string "$."
 		return (createProof assertionLabels markedNumbers)
 	where
-		createProof :: [String] -> [(Int,Bool)] -> [String]
+		createProof :: [Label] -> [(Int,Bool)] -> Proof
 		createProof assertionLabels markedNumbers = proof
 			where
 				proof :: Proof
@@ -303,7 +307,7 @@ mmpBlock (ctx, db) = do
 mmpTryUnlabeled :: String -> Parser ()
 mmpTryUnlabeled keyword = (try (string keyword) >> return ()) <?> (keyword ++ " keyword")
 
-mmpTryLabeled :: String -> Parser String
+mmpTryLabeled :: String -> Parser Label
 mmpTryLabeled keyword = (try $ do
 				lab <- mmpLabel
 				mmpSeparator
@@ -317,51 +321,51 @@ mmpSepListEndBy p end = manyTill (do {s <- p; mmpSeparator; return s}) (try (str
 mmpIdentifier :: Parser String
 mmpIdentifier = many1 (satisfy isMathSymbolChar) <?> "math symbol"
 
-mmpLabel :: Parser String
+mmpLabel :: Parser Label
 mmpLabel = many1 (alphaNum <|> oneOf "-_.")
 
 isMathSymbolChar :: Char -> Bool
 isMathSymbolChar c = isAscii c && not (isSpace c) && not (isControl c)
 
-mapSymbols :: Context -> [String] -> [Symbol]
+mapSymbols :: Context -> [String] -> Expression
 mapSymbols ctx = map $ \s ->
 			if s `elem` ctxConstants ctx then Con s
 			else if s `elem` ctxVariables ctx then Var s
 			else error ("Unknown math symbol " ++ s)
 
 
-mmComputeTheorem :: Database -> [String] -> Maybe [Symbol]
-mmComputeTheorem db labs = case computeStack db labs combine of [th] -> Just th; _ -> Nothing
+mmComputeTheorem :: Database -> Proof -> Maybe Expression
+mmComputeTheorem db proof = case foldProof db proof combine of [th] -> Just th; _ -> Nothing
 	where
-		combine :: Statement -> [(String, [Symbol])] -> [Symbol]
+		combine :: Statement -> [(Label, Expression)] -> Expression
 		combine stat labSymsList = newSyms
 			where
 				(_, _, syms, _) = stat
-				subst = case unify (map (\(lab, ss) -> (findSymbols db lab, ss)) labSymsList) of
+				subst = case unify (map (\(lab, ss) -> (findExpression db lab, ss)) labSymsList) of
 					Just s -> s
 					Nothing -> error "could not unify"
 				newSyms = applySubstitution subst syms
 
-computeStack :: Database -> [String] -> (Statement -> [(String, a)] -> a) -> [a]
-computeStack db labs f = computeStack' db labs f []
+foldProof :: Database -> Proof -> (Statement -> [(Label, a)] -> a) -> [a]
+foldProof db labs f = foldProof' db labs f []
 
-computeStack' :: Database -> [String] -> (Statement -> [(String, a)] -> a) -> [a] -> [a]
-computeStack' _ [] _ stack = stack
-computeStack' db (lab:labs) combine stack = computeStack' db labs combine (newTop:poppedStack)
+foldProof' :: Database -> Proof -> (Statement -> [(Label, a)] -> a) -> [a] -> [a]
+foldProof' _ [] _ stack = stack
+foldProof' db (lab:labs) f stack = foldProof' db labs f (newTop:poppedStack)
 	where
 		stat = findStatement db lab
 		hyps = getHypotheses stat
 		nHyps = length hyps
 		poppedStack = drop nHyps stack
-		newTop = combine stat (zip hyps (reverse (take nHyps stack)))
+		newTop = f stat (zip hyps (reverse (take nHyps stack)))
 
 
-type Substitution = [(String, [Symbol])]
+type Substitution = [(String, Expression)]
 
-unify :: [([Symbol], [Symbol])] -> Maybe Substitution
+unify :: [(Expression, Expression)] -> Maybe Substitution
 unify tuples = unify' tuples []
 
-unify' :: [([Symbol], [Symbol])] -> Substitution -> Maybe Substitution
+unify' :: [(Expression, Expression)] -> Substitution -> Maybe Substitution
 unify' [] subst = Just subst
 unify' (([Con c1, Var v], Con c2 : syms):tuples) subst | c1 == c2 && lookup v subst == Nothing =
 	unify' tuples ((v, syms) : subst)
@@ -369,7 +373,7 @@ unify' ((fromSyms, toSyms) : tuples) subst | applySubstitution subst fromSyms ==
 	unify' tuples subst
 unify' _ _ = Nothing
 
-applySubstitution :: Substitution -> [Symbol] -> [Symbol]
+applySubstitution :: Substitution -> Expression -> Expression
 applySubstitution _ [] = []
 applySubstitution subst (Con c : rest) = Con c : applySubstitution subst rest
 applySubstitution subst (Var v : rest) =
@@ -377,33 +381,33 @@ applySubstitution subst (Var v : rest) =
 	++ applySubstitution subst rest
 
 
-mmVerifiesLabel :: Database -> String -> Bool
+mmVerifiesLabel :: Database -> Label -> Bool
 mmVerifiesLabel db lab = mmVerifiesProof db proof
 	where
 		stat = findStatement db lab
 		(_, _, _, Theorem _ proof) = stat
 
-mmVerifiesProof :: Database -> [String] -> Bool
+mmVerifiesProof :: Database -> Proof -> Bool
 mmVerifiesProof db proof = case mmComputeTheorem db proof of Just _ -> True; Nothing -> False
 
 mmVerifiesDatabase :: Database -> Bool
 mmVerifiesDatabase db@(Database stats) = all (mmVerifiesProof db) (selectProofs stats)
 	where
-		selectProofs :: [Statement] -> [[String]]
+		selectProofs :: [Statement] -> [Proof]
 		selectProofs [] = []
 		selectProofs ((_, _, _, Theorem _ proof):rest) = proof : selectProofs rest
 		selectProofs (_:rest) = selectProofs rest
 
-findStatement :: Database -> String -> Statement
+findStatement :: Database -> Label -> Statement
 findStatement (Database []) lab = error $ "statement labeled " ++ lab ++ " not found"
 findStatement (Database (stat@(_, lab2, _, _):rest)) lab
 	| lab == lab2	= stat
 	| True		= findStatement (Database rest) lab
 
-findSymbols :: Database -> String -> [Symbol]
-findSymbols db lab = syms where (_, _, syms, _) = findStatement db lab
+findExpression :: Database -> Label -> Expression
+findExpression db lab = syms where (_, _, syms, _) = findStatement db lab
 
-getHypotheses :: Statement -> [String]
+getHypotheses :: Statement -> [Label]
 getHypotheses (_, _, _, Axiom hyp) = hyp
 getHypotheses (_, _, _, Theorem hyp _) = hyp
 getHypotheses _ = []
