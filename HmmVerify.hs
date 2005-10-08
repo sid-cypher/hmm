@@ -1,13 +1,10 @@
 module Main where
 
-import Hmm(mmParseFromString, mmVerifiesDatabase)
+import Hmm(mmParseFromString, mmVerifiesAll)
 
 main :: IO ()
 main = do
 	dbText <- getContents
 	let (_, db) = mmParseFromString dbText
-	if mmVerifiesDatabase db
-		then print "Yes!" 
-		else print "No..."
-
-
+	sequence_ $
+		map (\(lab, correct) -> putStrLn (lab ++ ": " ++ if correct then "verified" else "INCORRECT!")) (mmVerifiesAll db)
