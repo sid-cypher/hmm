@@ -1,3 +1,28 @@
+{-
+TODO list, roughly in order of preference:
+
+ - functionality: verifier should give more detail on what went wrong: no call
+   to "error" anymore on any input file (and add tests to check wrong input).
+
+ - readability: make (Context, Database) the state of GenParser, instead of
+   passing it around all the time
+
+ - performance: use Data.Map for the database
+
+ - performance: store active variables etc. in the context, instead of looking
+   them up every time
+
+ - readability: tuck special try/mmpSeparator stuff in new combinator.
+
+ - functionality: support for include files ($[ ... $])
+
+ - modularity: find some trick to export functions to HmmTest only.
+
+-}
+
+
+
+
 module Hmm
 	(Context(Context)
 	,ctxEmpty,ctxWithConstants,ctxWithVariables,ctxWithDisjoints
