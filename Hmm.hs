@@ -18,6 +18,10 @@ TODO list, roughly in order of preference:
 
  - modularity: find some trick to export functions to HmmTest only.
 
+ - typechecking: replace type synonyms by 'newtype'.
+
+ - readability: interleave this code with the relevant parts of the Metamath
+   specification
 -}
 
 
