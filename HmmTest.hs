@@ -47,7 +47,9 @@ testCases =
 
 	,mmParseFromString "$d x $." @?= (ctxEmpty, Database [])
 	,mmParseFromString "$d x y $." @?= (ctxEmpty `ctxWithDisjoints` [("y","x")], Database [])
-	,mmParseFromString "$d a bb ccc $." @?= (ctxEmpty `ctxWithDisjoints` [("ccc","a"), ("a","bb"),("a","ccc")], Database [])
+	,mmParseFromString "$d a bb ccc $." @?= (ctxEmpty `ctxWithDisjoints` [("ccc","a"), ("a","bb"),("bb","ccc")], Database [])
+	,mmParseFromString "$d x y $. $d x z $." @?= (ctxEmpty `ctxWithDisjoints` [("y","x"), ("x","z")], Database [])
+	,mmParseFromString "${ $d x y $. $} $d x z $." @?= (ctxEmpty `ctxWithDisjoints` [("x","z")], Database [])
 
 	,mmParseFromString "$c var $. $v x $." @?=
 		(ctxEmpty `ctxWithConstant` "var" `ctxWithVariable` "x"

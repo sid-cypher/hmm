@@ -126,6 +126,8 @@ instance Eq Context where
 	c1 == c2 =
 		sort (ctxConstants c1) == sort (ctxConstants c2)
 		&& sort (ctxVariables c1) == sort (ctxVariables c2)
+		&& sort (case ctxDisjoints c1 of Disjoints d -> map sortPair d)
+			== sort (case ctxDisjoints c2 of Disjoints d -> map sortPair d)
 
 ctxEmpty :: Context
 ctxEmpty = Context {ctxConstants = [], ctxVariables = [], ctxDisjoints = Disjoints []}
@@ -340,9 +342,9 @@ mmpBlock :: (Context, Database) -> Parser (Context, Database)
 mmpBlock (ctx, db) = do
 		mmpTryUnlabeled "${"
 		mmpSeparator
-		(ctx2, db2) <- mmpStatements (ctx, db)
+		(_, db2) <- mmpStatements (ctx, db)
 		string "$}"
-		return (ctx2, deactivateNonAssertions db2)
+		return (ctx, deactivateNonAssertions db2)
 	where
 		deactivateNonAssertions :: Database -> Database
 		deactivateNonAssertions (Database ss) =
