@@ -312,7 +312,8 @@ mmpCompressedProof db mandatoryLabels = do
 						newMarked = if mark then marked ++ [newSub] else marked
 
 						newSubs :: [Proof]
-						newSubs = subs ++ [newSub]
+						newSubs = (reverse . drop (snd (meaning !! n)) . reverse) subs
+							++ [newSub]
 
 						newP :: Proof
 						newP = p ++ newSteps

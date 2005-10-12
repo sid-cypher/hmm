@@ -191,6 +191,14 @@ testCases =
 			,"wph","wph","wi"
 			,"ax-1","a2i","ax-mp"
 			]
+	,do
+		Right (_, db) <- mmParseFromFile "set-part2.mm"
+		let (_, _, _, _, Theorem _ proof) = findStatement db "pm2.65"
+		proof @?=
+			["wph","wps","wi","wph","wph","wps","wn","wi","wph","wps"
+			,"wph","wps","wn","wi"
+			,"wn","wph","wps","pm3.2im","a2i","con2d"
+			] 
 	,do {Right (_, db) <- mmParseFromFile "peano.mm"; findStatement db "binop_plus" @?= (True, "binop_plus", [Con "BINOP", Con "+"], noDisjoints, Axiom [])}
 	,do {Right (_, db) <- mmParseFromFile "peano.mm"; mmVerifiesDatabase db @?= True}
 
