@@ -140,7 +140,7 @@ testCases =
 			]
 		)
 
-	,(case parse mmpCompressedNumbers "<test string>" "AAAB\nZB FAACA FAA\nFC DE $." of Left _ -> Nothing; Right l -> Just l)
+	,(case runParser mmpCompressedNumbers ctxEmpty "<test string>" "AAAB\nZB FAACA FAA\nFC DE $." of Left _ -> Nothing; Right l -> Just l)
 		@?= Just
 		[(0,False),(0,False),(0,False),(1,True ),(1,False)
 		,(5,False),(0,False),(0,False),(2,False),(0,False)

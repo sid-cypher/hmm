@@ -6,9 +6,6 @@ TODO list, roughly in order of preference:
  - functionality: verifier should give more detail on what went wrong: no call
    to "error" anymore on any input file (and add tests to check wrong input).
 
- - readability: make (Context, Database) the state of GenParser, instead of
-   passing it around all the time
-
  - performance: use Data.Map for the database
 
  - performance: store active variables etc. in the context, instead of looking
@@ -53,6 +50,7 @@ import Data.List(sort)
 import Data.Char(isSpace,isAscii,isControl)
 
 
+type MMParser a = CharParser Context a
 
 data Database = Database [Statement]
 	deriving (Eq, Show)
@@ -160,87 +158,98 @@ mmParseFromString :: String -> Either String (Context, Database)
 mmParseFromString s = mmParse "<string>" s
 
 mmParse :: String -> String -> Either String (Context, Database)
-mmParse source s = case parse mmpDatabase source s of
+mmParse source s = case runParser mmpDatabase ctxEmpty source s of
 			Left err -> Left (show err)
 			Right result -> Right result
 
 
-mmpDatabase :: Parser (Context, Database)
+mmpDatabase :: MMParser (Context, Database)
 mmpDatabase = do
 		try mmpSeparator <|> return ()
-		(ctx, db) <- mmpStatements (ctxEmpty, dbEmpty)
+		setState ctxEmpty
+		db <- mmpStatements dbEmpty
 		eof
+		ctx <- getState
 		return (ctx, db)
 
-mmpStatements :: (Context, Database) -> Parser (Context, Database)
-mmpStatements (ctx, db) =
+mmpStatements :: Database -> MMParser Database
+mmpStatements db =
 		do
-			(ctx2, dbstat) <- mmpStatement (ctx, db)
+			dbstat <- mmpStatement db
 			let db2 = db `dbWith` dbstat
 			(do
 				mmpSeparator
-				(ctx3, dbstats) <- mmpStatements (ctx2, db2)
-				return (ctx3, dbstat `dbWith` dbstats)
-			 <|> return (ctx2, dbstat))
-		<|> return (ctx, dbEmpty)
+				dbstats <- mmpStatements db2
+				return (dbstat `dbWith` dbstats)
+			 <|> return dbstat)
+		<|> return dbEmpty
 
-mmpStatement :: (Context, Database) -> Parser (Context, Database)
-mmpStatement (ctx, db) =
-		(   mmpConstants (ctx, db)
-		<|> mmpVariables (ctx, db)
-		<|> mmpDisjoints (ctx, db)
-		<|> mmpDollarE (ctx, db)
-		<|> mmpDollarF (ctx, db)
-		<|> mmpAxiom (ctx, db)
-		<|> mmpTheorem (ctx, db)
-		<|> mmpBlock (ctx, db)
+mmpStatement :: Database -> MMParser Database
+mmpStatement db =
+		(   ((  mmpConstants
+		    <|> mmpVariables
+		    <|> mmpDisjoints
+		    ) >> return (Database []))
+		<|> mmpDollarE
+		<|> mmpDollarF
+		<|> mmpAxiom db
+		<|> mmpTheorem db
+		<|> mmpBlock db
 		) <?> "statement"
 
-mmpSeparator :: Parser ()
+mmpSeparator :: MMParser ()
 mmpSeparator = do
 		many1 ((space >> return ()) <|> mmpComment)
 		return ()
 
-mmpComment :: Parser ()
+mmpComment :: MMParser ()
 mmpComment = do
 		try (string "$(")
 		manyTill anyChar (try (space >> string "$)"))
 		return ()
 	    <?> "comment"
 
-mmpConstants :: (Context, Database) -> Parser (Context, Database)
-mmpConstants (ctx, _db) = do
+mmpConstants :: MMParser ()
+mmpConstants = do
 		mmpTryUnlabeled "$c"
 		mmpSeparator
 		cs <- mmpSepListEndBy mmpIdentifier "$."
-		return (ctx `ctxWithConstants` cs, Database [])
+		ctx <- getState
+		setState (ctx `ctxWithConstants` cs)
+		return ()
 
-mmpVariables :: (Context, Database) -> Parser (Context, Database)
-mmpVariables (ctx, _db) = do
+mmpVariables :: MMParser ()
+mmpVariables = do
 		mmpTryUnlabeled "$v"
 		mmpSeparator
 		cs <- mmpSepListEndBy mmpIdentifier "$."
-		return (ctx `ctxWithVariables` cs, Database [])
+		ctx <- getState
+		setState (ctx `ctxWithVariables` cs)
+		return ()
 
-mmpDisjoints :: (Context, Database) -> Parser (Context, Database)
-mmpDisjoints (ctx, _db) = do
+mmpDisjoints :: MMParser ()
+mmpDisjoints = do
 		mmpTryUnlabeled "$d"
 		mmpSeparator
 		d <- mmpSepListEndBy mmpIdentifier "$."
 		let pairs = allPairs d
 		if samePairs pairs
 			then error ("found same variable twice in $d " ++ show d)
-			else return (ctx `ctxWithDisjoints` pairs, Database [])
+			else return ()
+		ctx <- getState
+		setState (ctx `ctxWithDisjoints` pairs)
+		return ()
 
-mmpDollarE :: (Context, Database) -> Parser (Context, Database)
-mmpDollarE (ctx, _db) = do
+mmpDollarE :: MMParser Database
+mmpDollarE = do
 		lab <- mmpTryLabeled "$e"
 		mmpSeparator
 		ss <- mmpSepListEndBy mmpIdentifier "$."
-		return (ctx, Database [(True, lab, mapSymbols ctx ss, DollarE)])
+		ctx <- getState
+		return (Database [(True, lab, mapSymbols ctx ss, DollarE)])
 
-mmpDollarF :: (Context, Database) -> Parser (Context, Database)
-mmpDollarF (ctx, _db) = do
+mmpDollarF :: MMParser Database
+mmpDollarF = do
 		lab <- mmpTryLabeled "$f"
 		mmpSeparator
 		c <- mmpIdentifier
@@ -248,32 +257,35 @@ mmpDollarF (ctx, _db) = do
 		v <- mmpIdentifier
 		mmpSeparator
 		string "$."
-		return (ctx, Database [(True, lab, mapSymbols ctx [c, v], DollarF)])
+		ctx <- getState
+		return (Database [(True, lab, mapSymbols ctx [c, v], DollarF)])
 
-mmpAxiom :: (Context, Database) -> Parser (Context, Database)
-mmpAxiom (ctx, db) = do
+mmpAxiom :: Database -> MMParser Database
+mmpAxiom db = do
 		lab <- mmpTryLabeled "$a"
 		mmpSeparator
 		ss <- mmpSepListEndBy mmpIdentifier "$."
+		ctx <- getState
 		let symbols = mapSymbols ctx ss
-		return (ctx, Database [(True, lab, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db) (selectMandatoryDisjointsFor symbols db ctx))])
+		return (Database [(True, lab, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db) (selectMandatoryDisjointsFor symbols db ctx))])
 
-mmpTheorem :: (Context, Database) -> Parser (Context, Database)
-mmpTheorem (ctx, db) = do
+mmpTheorem :: Database -> MMParser Database
+mmpTheorem db = do
 		lab <- mmpTryLabeled "$p"
 		mmpSeparator
 		ss <- mmpSepListEndBy mmpIdentifier "$="
 		mmpSeparator
+		ctx <- getState
 		let symbols = mapSymbols ctx ss
 		let mandatoryLabels = selectMandatoryLabelsForVarsOf symbols db
 		ps <- (mmpUncompressedProof <|> mmpCompressedProof db mandatoryLabels)
-		return (ctx, Database [(True, lab, symbols, Theorem mandatoryLabels (selectMandatoryDisjointsFor symbols db ctx) ps)])
+		return (Database [(True, lab, symbols, Theorem mandatoryLabels (selectMandatoryDisjointsFor symbols db ctx) ps)])
 
-mmpUncompressedProof :: Parser Proof
+mmpUncompressedProof :: MMParser Proof
 mmpUncompressedProof = do
 		mmpSepListEndBy mmpLabel "$."
 
-mmpCompressedProof :: Database -> [Label] -> Parser Proof
+mmpCompressedProof :: Database -> [Label] -> MMParser Proof
 mmpCompressedProof db mandatoryLabels = do
 		string "("
 		mmpSeparator
@@ -324,7 +336,7 @@ mmpCompressedProof db mandatoryLabels = do
 						newP :: Proof
 						newP = p ++ newSteps
 
-mmpCompressedNumbers :: Parser [(Int, Bool)]
+mmpCompressedNumbers :: MMParser [(Int, Bool)]
 mmpCompressedNumbers = manyTill
 		(do
 			n <- mmpCompressedNumber
@@ -333,7 +345,7 @@ mmpCompressedNumbers = manyTill
 		)
 		(try ((try mmpSeparator <|> return ()) >> string "$."))
 
-mmpCompressedNumber :: Parser Int
+mmpCompressedNumber :: MMParser Int
 mmpCompressedNumber = do
 		base20 <- many (do
 			c <- try ((try mmpSeparator <|> return ()) >> satisfy (\c -> 'U' <= c && c <= 'Y')) <?> "U...Y"
@@ -344,13 +356,15 @@ mmpCompressedNumber = do
 			return (fromEnum c - fromEnum 'A')
 		return (foldr (\x y -> x * 20 + y) base5 base20)
 
-mmpBlock :: (Context, Database) -> Parser (Context, Database)
-mmpBlock (ctx, db) = do
+mmpBlock :: Database -> MMParser Database
+mmpBlock db = do
+		ctx <- getState
 		mmpTryUnlabeled "${"
 		mmpSeparator
-		(_, db2) <- mmpStatements (ctx, db)
+		db2 <- mmpStatements db
 		string "$}"
-		return (ctx, deactivateNonAssertions db2)
+		setState ctx
+		return (deactivateNonAssertions db2)
 	where
 		deactivateNonAssertions :: Database -> Database
 		deactivateNonAssertions (Database ss) =
@@ -360,10 +374,10 @@ mmpBlock (ctx, db) = do
 					let newact = if isAssertion stat then act else False
 				]
 
-mmpTryUnlabeled :: String -> Parser ()
+mmpTryUnlabeled :: String -> MMParser ()
 mmpTryUnlabeled keyword = (try (string keyword) >> return ()) <?> (keyword ++ " keyword")
 
-mmpTryLabeled :: String -> Parser Label
+mmpTryLabeled :: String -> MMParser Label
 mmpTryLabeled keyword = (try $ do
 				lab <- mmpLabel
 				mmpSeparator
@@ -371,13 +385,13 @@ mmpTryLabeled keyword = (try $ do
 				return lab
 			) <?> ("labeled " ++ keyword ++ " keyword")
 
-mmpSepListEndBy :: Parser a -> String -> Parser [a]
+mmpSepListEndBy :: MMParser a -> String -> MMParser [a]
 mmpSepListEndBy p end = manyTill (do {s <- p; mmpSeparator; return s}) (try (string end))
 
-mmpIdentifier :: Parser String
+mmpIdentifier :: MMParser String
 mmpIdentifier = many1 (satisfy isMathSymbolChar) <?> "math symbol"
 
-mmpLabel :: Parser Label
+mmpLabel :: MMParser Label
 mmpLabel = many1 (alphaNum <|> oneOf "-_.")
 
 isMathSymbolChar :: Char -> Bool
