@@ -1,6 +1,8 @@
 {-
 TODO list, roughly in order of preference:
 
+ - functionality: check $d statements properly: 
+
  - functionality: verifier should give more detail on what went wrong: no call
    to "error" anymore on any input file (and add tests to check wrong input).
 
@@ -55,9 +57,9 @@ import Data.Char(isSpace,isAscii,isControl)
 data Database = Database [Statement]
 	deriving (Eq, Show)
 
-type Statement = (Bool, Label, Expression, Disjoints, StatementInfo)
+type Statement = (Bool, Label, Expression, StatementInfo)
 
-data StatementInfo = DollarE | DollarF | Axiom [Label] | Theorem [Label] Proof
+data StatementInfo = DollarE | DollarF | Axiom [Label] Disjoints | Theorem [Label] Disjoints Proof
 	deriving (Eq, Show, Ord)
 
 --NOTE: a Disjoints never may contain a pair of identical strings!
@@ -83,13 +85,17 @@ Database ss1 `dbWith` Database ss2 = Database (ss1++ss2)
 selectMandatoryDisjointsFor :: Expression -> Database -> Context -> Disjoints
 selectMandatoryDisjointsFor symbols db ctx = Disjoints ds
 	where
-		ds = [d | d@(x, y) <- case ctxDisjoints ctx of Disjoints ds2 -> ds2, x `elem` mandatoryVars, y `elem` mandatoryVars]
+		ds = [d |
+			d@(x, y) <- case ctxDisjoints ctx of Disjoints ds2 -> ds2,
+			x `elem` mandatoryVars,
+			y `elem` mandatoryVars
+			]
 		mandatoryVars = activeDollarEVars db ++ varsOf symbols
 
 selectMandatoryLabelsForVarsOf :: Expression -> Database -> [Label]
 selectMandatoryLabelsForVarsOf symbols db@(Database ss) =
 	[lab |
-		(act, lab, syms, _, info) <- ss,
+		(act, lab, syms, info) <- ss,
 		act,
 		case info of
 			DollarE -> True
@@ -101,7 +107,7 @@ selectMandatoryLabelsForVarsOf symbols db@(Database ss) =
 activeDollarEVars :: Database -> [String]
 activeDollarEVars (Database ss) =
 	concat [varsOf syms |
-		(act, _, syms, _, info) <- ss,
+		(act, _, syms, info) <- ss,
 		act,
 		info == DollarE
 	]
@@ -113,8 +119,8 @@ varsOf (Con _c : rest) = varsOf rest
 
 
 isAssertion :: Statement -> Bool
-isAssertion (_, _, _, _, Theorem _ _) = True
-isAssertion (_, _, _, _, Axiom _) = True
+isAssertion (_, _, _, Theorem _ _ _) = True
+isAssertion (_, _, _, Axiom _ _) = True
 isAssertion _ = False
 
 
@@ -231,7 +237,7 @@ mmpDollarE (ctx, _db) = do
 		lab <- mmpTryLabeled "$e"
 		mmpSeparator
 		ss <- mmpSepListEndBy mmpIdentifier "$."
-		return (ctx, Database [(True, lab, mapSymbols ctx ss, Disjoints [], DollarE)])
+		return (ctx, Database [(True, lab, mapSymbols ctx ss, DollarE)])
 
 mmpDollarF :: (Context, Database) -> Parser (Context, Database)
 mmpDollarF (ctx, _db) = do
@@ -242,7 +248,7 @@ mmpDollarF (ctx, _db) = do
 		v <- mmpIdentifier
 		mmpSeparator
 		string "$."
-		return (ctx, Database [(True, lab, mapSymbols ctx [c, v], Disjoints [], DollarF)])
+		return (ctx, Database [(True, lab, mapSymbols ctx [c, v], DollarF)])
 
 mmpAxiom :: (Context, Database) -> Parser (Context, Database)
 mmpAxiom (ctx, db) = do
@@ -250,7 +256,7 @@ mmpAxiom (ctx, db) = do
 		mmpSeparator
 		ss <- mmpSepListEndBy mmpIdentifier "$."
 		let symbols = mapSymbols ctx ss
-		return (ctx, Database [(True, lab, symbols, selectMandatoryDisjointsFor symbols db ctx, Axiom (selectMandatoryLabelsForVarsOf symbols db))])
+		return (ctx, Database [(True, lab, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db) (selectMandatoryDisjointsFor symbols db ctx))])
 
 mmpTheorem :: (Context, Database) -> Parser (Context, Database)
 mmpTheorem (ctx, db) = do
@@ -261,7 +267,7 @@ mmpTheorem (ctx, db) = do
 		let symbols = mapSymbols ctx ss
 		let mandatoryLabels = selectMandatoryLabelsForVarsOf symbols db
 		ps <- (mmpUncompressedProof <|> mmpCompressedProof db mandatoryLabels)
-		return (ctx, Database [(True, lab, symbols, selectMandatoryDisjointsFor symbols db ctx, Theorem mandatoryLabels ps)])
+		return (ctx, Database [(True, lab, symbols, Theorem mandatoryLabels (selectMandatoryDisjointsFor symbols db ctx) ps)])
 
 mmpUncompressedProof :: Parser Proof
 mmpUncompressedProof = do
@@ -349,8 +355,8 @@ mmpBlock (ctx, db) = do
 		deactivateNonAssertions :: Database -> Database
 		deactivateNonAssertions (Database ss) =
 			Database
-				[(newact, lab, symbols, disjoints, info) |
-					stat@(act, lab, symbols, disjoints, info) <- ss,
+				[(newact, lab, symbols, info) |
+					stat@(act, lab, symbols, info) <- ss,
 					let newact = if isAssertion stat then act else False
 				]
 
@@ -392,14 +398,14 @@ mmComputeTheorem db proof = case foldProof db proof combine of
 	where
 		combine :: Statement -> [(Label, Expression)] -> Either String Expression
 		combine stat labSymsList = case subst' of
-						Right _ -> newSyms'
+						Right _ -> Right newSyms
 						Left err -> Left ("no substitution found: " ++ err)
 			where
-				(_, _, syms, disjoints, _) = stat
+				(_, _, syms, _) = stat
 				subst' = unify (map (\(lab, ss) ->
-					let (expr, d) = findExpressionAndDisjoints db lab in (expr, d, ss)) labSymsList)
+					let (expr, _) = findExpressionAndDisjoints db lab in (expr, ss)) labSymsList)
 				subst = fromRight subst'
-				newSyms' = applySubstitution disjoints subst syms
+				newSyms = applySubstitution subst syms
 
 foldProof :: Show a => Database -> Proof -> (Statement -> [(Label, a)] -> Either String a) -> Either String [a]
 foldProof db labs f = foldProof' db labs f []
@@ -421,24 +427,20 @@ foldProof' db (lab:labs) f stack = case newTop' of
 
 type Substitution = [(String, Expression)]
 
-unify :: [(Expression, Disjoints, Expression)] -> Either String Substitution
+unify :: [(Expression, Expression)] -> Either String Substitution
 unify tuples = unify' tuples []
 
-unify' :: [(Expression, Disjoints, Expression)] -> Substitution -> Either String Substitution
+unify' :: [(Expression, Expression)] -> Substitution -> Either String Substitution
 unify' [] subst = Right subst
-unify' (([Con c1, Var v], _, Con c2 : syms):tuples) subst | c1 == c2 && lookup v subst == Nothing =
+unify' (([Con c1, Var v], Con c2 : syms):tuples) subst | c1 == c2 && lookup v subst == Nothing =
 	unify' tuples ((v, syms) : subst)
-unify' ((fromSyms, d, toSyms) : tuples) subst
-	| toSyms' == Right toSyms = unify' tuples subst
-	| True = case toSyms' of
-		Right _ -> Left ("substitution " ++ show subst ++ " does not turn " ++ show fromSyms ++ " into " ++ show toSyms ++ " but into " ++ show (fromRight toSyms'))
-		Left err -> Left ("could not find substitution from " ++ show fromSyms ++ " to " ++ show toSyms ++ ": " ++ err)
-	where toSyms' = applySubstitution d subst fromSyms
+unify' ((fromSyms, toSyms) : tuples) subst
+	| computedToSyms == toSyms = unify' tuples subst
+	| True = Left ("partial substitution " ++ show subst ++ " does not turn " ++ show fromSyms ++ " into " ++ show toSyms ++ " but into " ++ show computedToSyms)
+	where computedToSyms = applySubstitution subst fromSyms
 
-applySubstitution :: Disjoints -> Substitution -> Expression -> Either String Expression
-applySubstitution d subst expr = case checkSubstitution d subst of
-					True -> Right (applySubstitution' subst expr)
-					False -> Left ("violated disjoints")
+applySubstitution :: Substitution -> Expression -> Expression
+applySubstitution subst expr = applySubstitution' subst expr
 
 applySubstitution' :: Substitution -> Expression -> Expression
 applySubstitution' _ [] = []
@@ -447,13 +449,6 @@ applySubstitution' subst (Var v : rest) =
 	(case lookup v subst of Just ss -> ss; Nothing -> [Var v])
 	++ applySubstitution' subst rest
 
-checkSubstitution :: Disjoints -> Substitution -> Bool
-checkSubstitution (Disjoints disjoints) substitution =
-		and [ [(v, w) | v <- varsOf e, w <- varsOf f] `subset` disjoints |
-			((x, e), (y, f)) <- allPairs substitution,
-			(x, y) `elem` disjoints
-		]
-			
 
 mmVerifiesLabel :: Database -> Label -> Either String ()
 mmVerifiesLabel db lab = case mmVerifiesProof db proof of
@@ -461,17 +456,17 @@ mmVerifiesLabel db lab = case mmVerifiesProof db proof of
 				Right () -> Right ()
 	where
 		stat = findStatement db lab
-		(_, _, _, _, Theorem _ proof) = stat
+		(_, _, _, Theorem _ _ proof) = stat
 
 mmVerifiesProof :: Database -> Proof -> Either String ()
-mmVerifiesProof db proof = case mmComputeTheorem db proof of Right _ -> Right (); Left err -> Left err
+mmVerifiesProof db proof = case mmComputeTheorem db proof of Right _ -> Right (); Left err -> Left ("failed to verify proof " ++ show proof ++ ":" ++ err)
 
 mmVerifiesAll :: Database -> [(Label, Either String ())]
 mmVerifiesAll db@(Database stats) = map (\(lab, proof) -> (lab, mmVerifiesProof db proof)) (selectProofs stats)
 	where
 		selectProofs :: [Statement] -> [(Label, Proof)]
 		selectProofs [] = []
-		selectProofs ((_, lab, _, _, Theorem _ proof):rest) = (lab, proof) : selectProofs rest
+		selectProofs ((_, lab, _, Theorem _ _ proof):rest) = (lab, proof) : selectProofs rest
 		selectProofs (_:rest) = selectProofs rest
 
 mmVerifiesDatabase :: Database -> Bool
@@ -479,16 +474,22 @@ mmVerifiesDatabase db = all (\(_, res) -> case res of Left _ -> False; Right _ -
 
 findStatement :: Database -> Label -> Statement
 findStatement (Database []) lab = error $ "statement labeled " ++ lab ++ " not found"
-findStatement (Database (stat@(_, lab2, _, _, _):rest)) lab
+findStatement (Database (stat@(_, lab2, _, _):rest)) lab
 	| lab == lab2	= stat
 	| True		= findStatement (Database rest) lab
 
 findExpressionAndDisjoints :: Database -> Label -> (Expression, Disjoints)
-findExpressionAndDisjoints db lab = (syms, disjoints) where (_, _, syms, disjoints, _) = findStatement db lab
+findExpressionAndDisjoints db lab = (syms, disjoints)
+	where
+		(_, _, syms, info) = findStatement db lab
+		disjoints = case info of
+			Axiom _ d -> d
+			Theorem _ d _ -> d
+			_ -> error "only assertions have disjoints"
 
 getHypotheses :: Statement -> [Label]
-getHypotheses (_, _, _, _, Axiom hyp) = hyp
-getHypotheses (_, _, _, _, Theorem hyp _) = hyp
+getHypotheses (_, _, _, Axiom hyp _) = hyp
+getHypotheses (_, _, _, Theorem hyp _ _) = hyp
 getHypotheses _ = []
 
 
@@ -502,10 +503,10 @@ samePairs = any (\(x,y) -> x == y)
 sortPair :: Ord a => (a, a) -> (a, a)
 sortPair (x,y)	| x <= y = (x,y)
 		| True   = (y,x)
-
+{-
 subset :: Eq a => [a] -> [a] -> Bool
 subset l m = and [x `elem` m | x <- l]
-
+-}
 fromRight :: Show a => Either a b -> b
 fromRight (Right b) = b
 fromRight (Left a) = error ("impossible" ++ show a)
