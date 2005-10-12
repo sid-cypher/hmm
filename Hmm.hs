@@ -145,19 +145,18 @@ ctx `ctxWithDisjoints` ds = ctx {ctxDisjoints = Disjoints (ds ++ case ctxDisjoin
 
 
 
-mmParseFromFile:: String -> IO (Context, Database)
+mmParseFromFile:: String -> IO (Either String (Context, Database))
 mmParseFromFile path = do
 		contents <- readFile path
 		return (mmParse path contents)
 
-mmParseFromString :: String -> (Context, Database)
+mmParseFromString :: String -> Either String (Context, Database)
 mmParseFromString s = mmParse "<string>" s
 
-mmParse :: String -> String -> (Context, Database)
-mmParse source s =
-	case parse mmpDatabase source s of
-		Left err -> error $ show err
-		Right result -> result
+mmParse :: String -> String -> Either String (Context, Database)
+mmParse source s = case parse mmpDatabase source s of
+			Left err -> Left (show err)
+			Right result -> Right result
 
 
 mmpDatabase :: Parser (Context, Database)
@@ -384,49 +383,61 @@ mapSymbols ctx = map $ \s ->
 			else error ("Unknown math symbol " ++ s)
 
 
-mmComputeTheorem :: Database -> Proof -> Maybe Expression
-mmComputeTheorem db proof = case foldProof db proof combine of [th] -> Just th; _ -> Nothing
+mmComputeTheorem :: Database -> Proof -> Either String Expression
+mmComputeTheorem db proof = case foldProof db proof combine of
+				Right [th] -> Right th
+				Right stack -> Left ("proof produced not one theorem but stack " ++ show stack)
+				Left err -> Left ("error: " ++ err)
 	where
-		combine :: Statement -> [(Label, Expression)] -> Expression
-		combine stat labSymsList = newSyms
+		combine :: Statement -> [(Label, Expression)] -> Either String Expression
+		combine stat labSymsList = case subst' of
+						Right _ -> newSyms'
+						Left err -> Left ("no substitution found: " ++ err)
 			where
 				(_, _, syms, disjoints, _) = stat
-				subst = case unify (map (\(lab, ss) -> let (expr, d) = findExpressionAndDisjoints db lab in (expr, d, ss)) labSymsList) of
-					Just s -> s
-					Nothing -> error "could not unify"
-				newSyms = case applySubstitution disjoints subst syms of
-					Just expr -> expr
-					_ -> error ("disjoints violation: disjoints=" ++ show disjoints ++ ", subst=" ++ show subst ++ ", syms=" ++ show syms)
+				subst' = unify (map (\(lab, ss) ->
+					let (expr, d) = findExpressionAndDisjoints db lab in (expr, d, ss)) labSymsList)
+				subst = fromRight subst'
+				newSyms' = applySubstitution disjoints subst syms
 
-foldProof :: Database -> Proof -> (Statement -> [(Label, a)] -> a) -> [a]
+foldProof :: Show a => Database -> Proof -> (Statement -> [(Label, a)] -> Either String a) -> Either String [a]
 foldProof db labs f = foldProof' db labs f []
 
-foldProof' :: Database -> Proof -> (Statement -> [(Label, a)] -> a) -> [a] -> [a]
-foldProof' _ [] _ stack = stack
-foldProof' db (lab:labs) f stack = foldProof' db labs f (newTop:poppedStack)
+foldProof' :: Show a => Database -> Proof -> (Statement -> [(Label, a)] -> Either String a) -> [a] -> Either String [a]
+foldProof' _ [] _ stack = Right stack
+foldProof' db (lab:labs) f stack = case newTop' of
+					Left err -> Left ("could not apply assertion " ++ show lab ++ " (" ++ show (length labs + 1) ++ "th from the right in the proof) to the top " ++ show nHyps ++ " stack entries " ++ show pairs ++ ": " ++ err)
+					Right newTop -> foldProof' db labs f (newTop:poppedStack)
 	where
 		stat = findStatement db lab
 		hyps = getHypotheses stat
 		nHyps = length hyps
 		poppedStack = drop nHyps stack
-		newTop = f stat (zip hyps (reverse (take nHyps stack)))
+		newTop' = f stat pairs
+		pairs = zip hyps (reverse (take nHyps stack))
+		--TODO: check that the stack has enough entries!
 
 
 type Substitution = [(String, Expression)]
 
-unify :: [(Expression, Disjoints, Expression)] -> Maybe Substitution
+unify :: [(Expression, Disjoints, Expression)] -> Either String Substitution
 unify tuples = unify' tuples []
 
-unify' :: [(Expression, Disjoints, Expression)] -> Substitution -> Maybe Substitution
-unify' [] subst = Just subst
+unify' :: [(Expression, Disjoints, Expression)] -> Substitution -> Either String Substitution
+unify' [] subst = Right subst
 unify' (([Con c1, Var v], _, Con c2 : syms):tuples) subst | c1 == c2 && lookup v subst == Nothing =
 	unify' tuples ((v, syms) : subst)
-unify' ((fromSyms, d, toSyms) : tuples) subst | applySubstitution d subst fromSyms == Just toSyms =
-	unify' tuples subst
-unify' _ _ = Nothing
+unify' ((fromSyms, d, toSyms) : tuples) subst
+	| toSyms' == Right toSyms = unify' tuples subst
+	| True = case toSyms' of
+		Right _ -> Left ("substitution " ++ show subst ++ " does not turn " ++ show fromSyms ++ " into " ++ show toSyms ++ " but into " ++ show (fromRight toSyms'))
+		Left err -> Left ("could not find substitution from " ++ show fromSyms ++ " to " ++ show toSyms ++ ": " ++ err)
+	where toSyms' = applySubstitution d subst fromSyms
 
-applySubstitution :: Disjoints -> Substitution -> Expression -> Maybe Expression
-applySubstitution d subst expr = if checkSubstitution d subst then Just (applySubstitution' subst expr) else Nothing
+applySubstitution :: Disjoints -> Substitution -> Expression -> Either String Expression
+applySubstitution d subst expr = case checkSubstitution d subst of
+					True -> Right (applySubstitution' subst expr)
+					False -> Left ("violated disjoints")
 
 applySubstitution' :: Substitution -> Expression -> Expression
 applySubstitution' _ [] = []
@@ -443,16 +454,18 @@ checkSubstitution (Disjoints disjoints) substitution =
 		]
 			
 
-mmVerifiesLabel :: Database -> Label -> Bool
-mmVerifiesLabel db lab = mmVerifiesProof db proof
+mmVerifiesLabel :: Database -> Label -> Either String ()
+mmVerifiesLabel db lab = case mmVerifiesProof db proof of
+				Left err -> Left ("proof of " ++ show lab ++ ": " ++ err)
+				Right () -> Right ()
 	where
 		stat = findStatement db lab
 		(_, _, _, _, Theorem _ proof) = stat
 
-mmVerifiesProof :: Database -> Proof -> Bool
-mmVerifiesProof db proof = case mmComputeTheorem db proof of Just _ -> True; Nothing -> False
+mmVerifiesProof :: Database -> Proof -> Either String ()
+mmVerifiesProof db proof = case mmComputeTheorem db proof of Right _ -> Right (); Left err -> Left err
 
-mmVerifiesAll :: Database -> [(Label, Bool)]
+mmVerifiesAll :: Database -> [(Label, Either String ())]
 mmVerifiesAll db@(Database stats) = map (\(lab, proof) -> (lab, mmVerifiesProof db proof)) (selectProofs stats)
 	where
 		selectProofs :: [Statement] -> [(Label, Proof)]
@@ -461,7 +474,7 @@ mmVerifiesAll db@(Database stats) = map (\(lab, proof) -> (lab, mmVerifiesProof 
 		selectProofs (_:rest) = selectProofs rest
 
 mmVerifiesDatabase :: Database -> Bool
-mmVerifiesDatabase db = all snd (mmVerifiesAll db)
+mmVerifiesDatabase db = all (\(_, res) -> case res of Left _ -> False; Right _ -> True) (mmVerifiesAll db)
 
 findStatement :: Database -> Label -> Statement
 findStatement (Database []) lab = error $ "statement labeled " ++ lab ++ " not found"
@@ -491,3 +504,7 @@ sortPair (x,y)	| x <= y = (x,y)
 
 subset :: Eq a => [a] -> [a] -> Bool
 subset l m = and [x `elem` m | x <- l]
+
+fromRight :: Show a => Either a b -> b
+fromRight (Right b) = b
+fromRight (Left a) = error ("impossible" ++ show a)

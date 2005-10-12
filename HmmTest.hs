@@ -21,57 +21,57 @@ testCases =
 	"string-based tests" ~: test
 	[Disjoints (allPairs ["1","5","3","2"]) @?= Disjoints [("1","2"),("1","5"),("1","3"),("3","5"),("5","2"),("2","3")]
 	
-	,mmParseFromString "" @?= (ctxEmpty, Database [])
-	,mmParseFromString " \n  " @?= (ctxEmpty, Database [])
-	,mmParseFromString "$( $)" @?= (ctxEmpty, Database [])
-	,mmParseFromString "$( $)         " @?= (ctxEmpty, Database [])
-	,mmParseFromString " \t\n  $( hoi\nhoi $) " @?= (ctxEmpty, Database [])
+	,mmParseFromString "" @?= Right (ctxEmpty, Database [])
+	,mmParseFromString " \n  " @?= Right (ctxEmpty, Database [])
+	,mmParseFromString "$( $)" @?= Right (ctxEmpty, Database [])
+	,mmParseFromString "$( $)         " @?= Right (ctxEmpty, Database [])
+	,mmParseFromString " \t\n  $( hoi\nhoi $) " @?= Right (ctxEmpty, Database [])
 
-	,mmParseFromString "$c x $." @?= (ctxEmpty `ctxWithConstant` "x", Database [])
-	,mmParseFromString "$c y $." @?= (ctxEmpty `ctxWithConstant` "y", Database [])
-	,mmParseFromString "$c xyzzy $." @?= (ctxEmpty `ctxWithConstant` "xyzzy", Database [])
-	,mmParseFromString "$c x z y $." @?= (ctxEmpty `ctxWithConstants` ["x", "y", "z"], Database [])
-	,mmParseFromString "$c $( no constants here $) $." @?= (ctxEmpty, Database [])
-	,mmParseFromString "$c x $( a comment\nin the middle $) y $." @?= (ctxEmpty `ctxWithConstants` ["x", "y"], Database [])
-	,mmParseFromString "$c x $. $c y $." @?= (ctxEmpty `ctxWithConstants` ["x", "y"], Database [])
-	,mmParseFromString "\n$c x $.\n$c y $.\n$( final comment $)\n" @?= (ctxEmpty `ctxWithConstants` ["x", "y"], Database [])
+	,mmParseFromString "$c x $." @?= Right (ctxEmpty `ctxWithConstant` "x", Database [])
+	,mmParseFromString "$c y $." @?= Right (ctxEmpty `ctxWithConstant` "y", Database [])
+	,mmParseFromString "$c xyzzy $." @?= Right (ctxEmpty `ctxWithConstant` "xyzzy", Database [])
+	,mmParseFromString "$c x z y $." @?= Right (ctxEmpty `ctxWithConstants` ["x", "y", "z"], Database [])
+	,mmParseFromString "$c $( no constants here $) $." @?= Right (ctxEmpty, Database [])
+	,mmParseFromString "$c x $( a comment\nin the middle $) y $." @?= Right (ctxEmpty `ctxWithConstants` ["x", "y"], Database [])
+	,mmParseFromString "$c x $. $c y $." @?= Right (ctxEmpty `ctxWithConstants` ["x", "y"], Database [])
+	,mmParseFromString "\n$c x $.\n$c y $.\n$( final comment $)\n" @?= Right (ctxEmpty `ctxWithConstants` ["x", "y"], Database [])
 
-	,mmParseFromString "$v x $." @?= (ctxEmpty `ctxWithVariable` "x", Database [])
-	,mmParseFromString "$v y $." @?= (ctxEmpty `ctxWithVariable` "y", Database [])
-	,mmParseFromString "$v xyzzy $." @?= (ctxEmpty `ctxWithVariable` "xyzzy", Database [])
-	,mmParseFromString "$v x z y $." @?= (ctxEmpty `ctxWithVariables` ["x", "y", "z"], Database [])
-	,mmParseFromString "$v $( no constants here $) $." @?= (ctxEmpty, Database [])
-	,mmParseFromString "$v x $( a comment\nin the middle $) y $." @?= (ctxEmpty `ctxWithVariables` ["x", "y"], Database [])
-	,mmParseFromString "$v x $. $v y $." @?= (ctxEmpty `ctxWithVariables` ["x", "y"], Database [])
-	,mmParseFromString "\n$v x $.\n$v y $.\n$( final comment $)\n" @?= (ctxEmpty `ctxWithVariables` ["x", "y"], Database [])
+	,mmParseFromString "$v x $." @?= Right (ctxEmpty `ctxWithVariable` "x", Database [])
+	,mmParseFromString "$v y $." @?= Right (ctxEmpty `ctxWithVariable` "y", Database [])
+	,mmParseFromString "$v xyzzy $." @?= Right (ctxEmpty `ctxWithVariable` "xyzzy", Database [])
+	,mmParseFromString "$v x z y $." @?= Right (ctxEmpty `ctxWithVariables` ["x", "y", "z"], Database [])
+	,mmParseFromString "$v $( no constants here $) $." @?= Right (ctxEmpty, Database [])
+	,mmParseFromString "$v x $( a comment\nin the middle $) y $." @?= Right (ctxEmpty `ctxWithVariables` ["x", "y"], Database [])
+	,mmParseFromString "$v x $. $v y $." @?= Right (ctxEmpty `ctxWithVariables` ["x", "y"], Database [])
+	,mmParseFromString "\n$v x $.\n$v y $.\n$( final comment $)\n" @?= Right (ctxEmpty `ctxWithVariables` ["x", "y"], Database [])
 
-	,mmParseFromString "$d x $." @?= (ctxEmpty, Database [])
-	,mmParseFromString "$d x y $." @?= (ctxEmpty `ctxWithDisjoints` [("y","x")], Database [])
-	,mmParseFromString "$d a bb ccc $." @?= (ctxEmpty `ctxWithDisjoints` [("ccc","a"), ("a","bb"),("bb","ccc")], Database [])
-	,mmParseFromString "$d x y $. $d x z $." @?= (ctxEmpty `ctxWithDisjoints` [("y","x"), ("x","z")], Database [])
-	,mmParseFromString "${ $d x y $. $} $d x z $." @?= (ctxEmpty `ctxWithDisjoints` [("x","z")], Database [])
+	,mmParseFromString "$d x $." @?= Right (ctxEmpty, Database [])
+	,mmParseFromString "$d x y $." @?= Right (ctxEmpty `ctxWithDisjoints` [("y","x")], Database [])
+	,mmParseFromString "$d a bb ccc $." @?= Right (ctxEmpty `ctxWithDisjoints` [("ccc","a"), ("a","bb"),("bb","ccc")], Database [])
+	,mmParseFromString "$d x y $. $d x z $." @?= Right (ctxEmpty `ctxWithDisjoints` [("y","x"), ("x","z")], Database [])
+	,mmParseFromString "${ $d x y $. $} $d x z $." @?= Right (ctxEmpty `ctxWithDisjoints` [("x","z")], Database [])
 
 	,mmParseFromString "$c var $. $v x $." @?=
-		(ctxEmpty `ctxWithConstant` "var" `ctxWithVariable` "x"
+		Right (ctxEmpty `ctxWithConstant` "var" `ctxWithVariable` "x"
 		,Database []
 		)
 
 	,mmParseFromString "$c |- $. $v P $. assume-p $e |- P $." @?=
-		(ctxEmpty `ctxWithConstant` "|-" `ctxWithVariable` "P"
+		Right (ctxEmpty `ctxWithConstant` "|-" `ctxWithVariable` "P"
 		,Database [(True, "assume-p", [Con "|-", Var "P"], noDisjoints, DollarE)]
 		)
 
 	,mmParseFromString "$c var $. $v x $. vx $f var x $." @?=
-		(ctxEmpty `ctxWithConstant` "var" `ctxWithVariable` "x"
+		Right (ctxEmpty `ctxWithConstant` "var" `ctxWithVariable` "x"
 		,Database [(True, "vx", [Con "var", Var "x"], noDisjoints, DollarF)]
 		)
 
 	,mmParseFromString "$c term $. $v x $. tx $a term x $." @?=
-		(ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x"
+		Right (ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x"
 		,Database [(True, "tx", [Con "term", Var "x"], noDisjoints, Axiom [])]
 		)
 
-	,findStatement (snd (mmParseFromString "$c term $. $v x $. tx $a term x $.")) "tx" @?=
+	,findStatement (case mmParseFromString "$c term $. $v x $. tx $a term x $." of Right (_, db) -> db; _ -> error "imipossible") "tx" @?=
 		(True, "tx", [Con "term", Var "x"], noDisjoints, Axiom [])
 
 	,mmParseFromString (unlines
@@ -81,14 +81,14 @@ testCases =
 		,"th-tx $p term x $= tx $."
 		])
 	 @?=
-		(ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x"
+		Right (ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x"
 		,Database
 			[(True, "ax-tx", [Con "term", Var "x"], noDisjoints, Axiom [])
 			,(True, "th-tx", [Con "term", Var "x"], noDisjoints, Theorem [] ["tx"])
 			]
 		)
 
-	,mmParseFromString "${ $}" @?= (ctxEmpty,Database [])
+	,mmParseFromString "${ $}" @?= Right (ctxEmpty,Database [])
 
 	,mmParseFromString (unlines
 		["$c |- ( -> ) $."
@@ -101,7 +101,7 @@ testCases =
 		,"$}"
 		])
 	 @?=
-		(ctxEmpty
+		Right (ctxEmpty
 		 `ctxWithConstants` ["|-", "(", ")", "->"]
 		 `ctxWithVariables` ["P", "Q"]
 		,Database
@@ -126,7 +126,7 @@ testCases =
 		,"$}"
 		])
 	 @?=
-		(ctxEmpty
+		Right (ctxEmpty
 		 `ctxWithConstants` ["wff", "|-"]
 		 `ctxWithVariables` ["P", "Q", "R", "S"]
 		,Database
@@ -150,7 +150,7 @@ testCases =
 
 	"file-based tests" ~: test
 	[do {db <- mmParseFromFile "demo0.mm"; db @?=
-		(ctxEmpty
+		Right (ctxEmpty
 			`ctxWithConstants` ["0","+","=","->","(",")","term","wff","|-"]
 			`ctxWithVariables` ["t","r","s","P","Q"]
 		,Database
@@ -171,16 +171,16 @@ testCases =
 			,(True, "th1",[Con "|-",Var "t",Con "=",Var "t"],noDisjoints,Theorem ["tt"] ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"])
 			]
 		)}
-	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmComputeTheorem db ["tt"] @?= Just [Con "term", Var "t"]}
-	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmComputeTheorem db ["tt", "tze", "tpl"] @?=
-		Just [Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"]}
-	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesLabel db "th1" @?= True}
-	,do {(_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesDatabase db @?= True}
+	,do {Right (_, db) <- mmParseFromFile "demo0.mm"; mmComputeTheorem db ["tt"] @?= Right [Con "term", Var "t"]}
+	,do {Right (_, db) <- mmParseFromFile "demo0.mm"; mmComputeTheorem db ["tt", "tze", "tpl"] @?=
+		Right [Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"]}
+	,do {Right (_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesLabel db "th1" @?= Right ()}
+	,do {Right (_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesDatabase db @?= True}
 
-	,do {(_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesLabel db "a1i" @?= True}
-	,do {(_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesLabel db "a2i" @?= True}
+	,do {Right (_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesLabel db "a1i" @?= Right ()}
+	,do {Right (_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesLabel db "a2i" @?= Right ()}
 	,do
-		(_, db) <- mmParseFromFile "set-part.mm"
+		Right (_, db) <- mmParseFromFile "set-part.mm"
 		let (_, _, _, _, Theorem _ proof) = findStatement db "id"
 		proof @?=
 			["wph","wph","wph","wi","wi"
@@ -191,12 +191,16 @@ testCases =
 			,"wph","wph","wi"
 			,"ax-1","a2i","ax-mp"
 			]
-	,do {(_, db) <- mmParseFromFile "peano.mm"; findStatement db "binop_plus" @?= (True, "binop_plus", [Con "BINOP", Con "+"], noDisjoints, Axiom [])}
-	,do {(_, db) <- mmParseFromFile "peano.mm"; mmVerifiesDatabase db @?= True}
+	,do {Right (_, db) <- mmParseFromFile "peano.mm"; findStatement db "binop_plus" @?= (True, "binop_plus", [Con "BINOP", Con "+"], noDisjoints, Axiom [])}
+	,do {Right (_, db) <- mmParseFromFile "peano.mm"; mmVerifiesDatabase db @?= True}
 
-	,do {(_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesDatabase db @?= True}
+	,do {Right (_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesDatabase db @?= True}
 
-	,do {(_, db) <- mmParseFromFile "set-part2.mm"; mmVerifiesLabel db "ax17eq" @?= True}
+	,do
+		Right (_, db) <- mmParseFromFile "set-part2.mm"
+		let (_, _, _, disjoints, Theorem _ _) = findStatement db "ax17eq"
+		disjoints @?= Disjoints [("x", "z"), ("y", "z")]
+	,do {Right (_, db) <- mmParseFromFile "set-part2.mm"; mmVerifiesLabel db "ax17eq" @?= Right ()}
 
 	]
 
