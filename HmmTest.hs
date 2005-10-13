@@ -140,8 +140,8 @@ testCases =
 			]
 		)
 
-	,(case runParser mmpCompressedNumbers ctxEmpty "<test string>" "T UA UB UUA YYT $." of Left _ -> Nothing; Right l -> Just l)
-		@?= Just [(19,False),(20,False),(21,False),(120,False),(619,False)]
+	,(case runParser mmpCompressedNumbers ctxEmpty "<test string>" "T UA UB UVA VUA $." of Left _ -> Nothing; Right l -> Just l)
+		@?= Just [(19,False),(20,False),(21,False),(120,False),(200,False)]
 	,(case runParser mmpCompressedNumbers ctxEmpty "<test string>" "AAAB\nZB FAACA FAA\nFC DE $." of Left _ -> Nothing; Right l -> Just l)
 		@?= Just
 		[(0,False),(0,False),(0,False),(1,True ),(1,False)
@@ -196,6 +196,7 @@ testCases =
 			,"ax-1","a2i","ax-mp"
 			]
 		mmVerifiesDatabase db @?= True
+
 	,do
 		Right (_, db) <- mmParseFromFile "set-part2.mm"
 		let (_, _, _, Theorem _ _ proof) = findStatement db "cbvex"
@@ -213,6 +214,10 @@ testCases =
 		Right (_, db) <- mmParseFromFile "peano.mm"
 		findStatement db "binop_plus" @?= (True, "binop_plus", [Con "BINOP", Con "+"], Axiom [] noDisjoints)
 		mmVerifiesDatabase db @?= True
+
+	,do
+		Right (_, db) <- mmParseFromFile "ql-part.mm"
+		mmVerifiesLabel db "ska2" @?= Right ()
 	]
 
 	]

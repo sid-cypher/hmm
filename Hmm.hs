@@ -356,7 +356,9 @@ mmpCompressedNumber = do
 		base20 <- do
 			c <- try ((try mmpSeparator <|> return ()) >> satisfy (\c -> 'A' <= c && c <= 'T')) <?> "A...T"
 			return (fromEnum c - fromEnum 'A')
-		return (foldl (\x y -> x * 5 + y) 0 base5 * 20 + base20 )
+		let specifiedNumber = foldl (\x y -> x * 5 + y) 0 base5 * 20 + base20
+		let hackedNumber = if specifiedNumber >= 140 then specifiedNumber - 20 else specifiedNumber
+		return hackedNumber
 
 mmpBlock :: Database -> MMParser Database
 mmpBlock db = do
