@@ -140,6 +140,8 @@ testCases =
 			]
 		)
 
+	,(case runParser mmpCompressedNumbers ctxEmpty "<test string>" "T UA UB UUA YYT $." of Left _ -> Nothing; Right l -> Just l)
+		@?= Just [(19,False),(20,False),(21,False),(120,False),(619,False)]
 	,(case runParser mmpCompressedNumbers ctxEmpty "<test string>" "AAAB\nZB FAACA FAA\nFC DE $." of Left _ -> Nothing; Right l -> Just l)
 		@?= Just
 		[(0,False),(0,False),(0,False),(1,True ),(1,False)
@@ -193,12 +195,14 @@ testCases =
 			]
 	,do
 		Right (_, db) <- mmParseFromFile "set-part2.mm"
-		let (_, _, _, Theorem _ _ proof) = findStatement db "pm2.65"
+		let (_, _, _, Theorem _ _ proof) = findStatement db "cbvex"
 		proof @?=
-			["wph","wps","wi","wph","wph","wps","wn","wi","wph","wps"
-			,"wph","wps","wn","wi"
-			,"wn","wph","wps","pm3.2im","a2i","con2d"
-			] 
+			["wph","wn","vx","wal","wn","wps","wn","vy","wal","wn","wph","vx","wex","wps","vy","wex","wph","wn","vx","wal","wps"
+			,"wn","vy","wal","wph","wn","wps","wn","vx","vy","wph","vy","cbvex.1","hbne","wps","vx","cbvex.2","hbne","vx"
+			,"vy","weq","wph","wps","cbvex.3","negbid","cbval","negbii","wph","vx","df-ex","wps","vy","df-ex"
+			,"3bitr4"
+			]
+
 	,do {Right (_, db) <- mmParseFromFile "peano.mm"; findStatement db "binop_plus" @?= (True, "binop_plus", [Con "BINOP", Con "+"], Axiom [] noDisjoints)}
 	,do {Right (_, db) <- mmParseFromFile "peano.mm"; mmVerifiesDatabase db @?= True}
 
@@ -209,7 +213,6 @@ testCases =
 		let (_, _, _, Theorem _ disjoints _) = findStatement db "ax17eq"
 		disjoints @?= Disjoints [("x", "z"), ("y", "z")]
 	,do {Right (_, db) <- mmParseFromFile "set-part2.mm"; mmVerifiesLabel db "ax17eq" @?= Right ()}
-
 	]
 
 	]

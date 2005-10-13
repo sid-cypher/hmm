@@ -347,14 +347,14 @@ mmpCompressedNumbers = manyTill
 
 mmpCompressedNumber :: MMParser Int
 mmpCompressedNumber = do
-		base20 <- many (do
+		base5 <- many (do
 			c <- try ((try mmpSeparator <|> return ()) >> satisfy (\c -> 'U' <= c && c <= 'Y')) <?> "U...Y"
-			return (fromEnum c - fromEnum 'U')
+			return (fromEnum c - fromEnum 'U' + 1)
 			)
-		base5 <- do
+		base20 <- do
 			c <- try ((try mmpSeparator <|> return ()) >> satisfy (\c -> 'A' <= c && c <= 'T')) <?> "A...T"
 			return (fromEnum c - fromEnum 'A')
-		return (foldr (\x y -> x * 20 + y) base5 base20)
+		return (foldl (\x y -> x * 5 + y) 0 base5 * 20 + base20 )
 
 mmpBlock :: Database -> MMParser Database
 mmpBlock db = do
