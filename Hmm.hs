@@ -21,6 +21,8 @@ TODO list, roughly in order of preference:
 
  - readability: interleave this code with the relevant parts of the Metamath
    specification
+
+ - functionality: support and ignore proofs containing a '?'
 -}
 
 
