@@ -151,38 +151,40 @@ testCases =
 	],
 
 	"file-based tests" ~: test
-	[do {db <- mmParseFromFile "demo0.mm"; db @?=
-		Right (ctxEmpty
-			`ctxWithConstants` ["0","+","=","->","(",")","term","wff","|-"]
-			`ctxWithVariables` ["t","r","s","P","Q"]
-		,Database
-			[(True, "tt",[Con "term",Var "t"],DollarF)
-			,(True, "tr",[Con "term",Var "r"],DollarF)
-			,(True, "ts",[Con "term",Var "s"],DollarF)
-			,(True, "wp",[Con "wff",Var "P"],DollarF)
-			,(True, "wq",[Con "wff",Var "Q"],DollarF)
-			,(True, "tze",[Con "term",Con "0"],Axiom [] noDisjoints)
-			,(True, "tpl",[Con "term",Con "(",Var "t",Con "+",Var "r",Con ")"],Axiom ["tt", "tr"] noDisjoints)
-			,(True, "weq",[Con "wff",Var "t",Con "=",Var "r"],Axiom ["tt", "tr"] noDisjoints)
-			,(True, "wim",[Con "wff",Con "(",Var "P",Con "->",Var "Q",Con ")"],Axiom ["wp", "wq"] noDisjoints)
-			,(True, "a1",[Con "|-",Con "(",Var "t",Con "=",Var "r",Con "->",Con "(",Var "t",Con "=",Var "s",Con "->",Var "r",Con "=",Var "s",Con ")",Con ")"],Axiom ["tt", "tr", "ts"] noDisjoints)
-			,(True, "a2",[Con "|-",Con "(",Var "t",Con "+",Con "0",Con ")",Con "=",Var "t"],Axiom ["tt"] noDisjoints)
-			,(False, "min",[Con "|-",Var "P"],DollarE)
-			,(False, "maj",[Con "|-",Con "(",Var "P",Con "->",Var "Q",Con ")"],DollarE)
-			,(True, "mp",[Con "|-",Var "Q"],Axiom ["wp", "wq", "min", "maj"] noDisjoints)
-			,(True, "th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem ["tt"] noDisjoints ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"])
-			]
-		)}
-	,do {Right (_, db) <- mmParseFromFile "demo0.mm"; mmComputeTheorem db ["tt"] @?= Right [Con "term", Var "t"]}
-	,do {Right (_, db) <- mmParseFromFile "demo0.mm"; mmComputeTheorem db ["tt", "tze", "tpl"] @?=
-		Right [Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"]}
-	,do {Right (_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesLabel db "th1" @?= Right ()}
-	,do {Right (_, db) <- mmParseFromFile "demo0.mm"; mmVerifiesDatabase db @?= True}
+	[do 
+		result@(Right (_, db)) <- mmParseFromFile "demo0.mm"
+		result @?=
+			Right (ctxEmpty
+				`ctxWithConstants` ["0","+","=","->","(",")","term","wff","|-"]
+				`ctxWithVariables` ["t","r","s","P","Q"]
+			,Database
+				[(True, "tt",[Con "term",Var "t"],DollarF)
+				,(True, "tr",[Con "term",Var "r"],DollarF)
+				,(True, "ts",[Con "term",Var "s"],DollarF)
+				,(True, "wp",[Con "wff",Var "P"],DollarF)
+				,(True, "wq",[Con "wff",Var "Q"],DollarF)
+				,(True, "tze",[Con "term",Con "0"],Axiom [] noDisjoints)
+				,(True, "tpl",[Con "term",Con "(",Var "t",Con "+",Var "r",Con ")"],Axiom ["tt", "tr"] noDisjoints)
+				,(True, "weq",[Con "wff",Var "t",Con "=",Var "r"],Axiom ["tt", "tr"] noDisjoints)
+				,(True, "wim",[Con "wff",Con "(",Var "P",Con "->",Var "Q",Con ")"],Axiom ["wp", "wq"] noDisjoints)
+				,(True, "a1",[Con "|-",Con "(",Var "t",Con "=",Var "r",Con "->",Con "(",Var "t",Con "=",Var "s",Con "->",Var "r",Con "=",Var "s",Con ")",Con ")"],Axiom ["tt", "tr", "ts"] noDisjoints)
+				,(True, "a2",[Con "|-",Con "(",Var "t",Con "+",Con "0",Con ")",Con "=",Var "t"],Axiom ["tt"] noDisjoints)
+				,(False, "min",[Con "|-",Var "P"],DollarE)
+				,(False, "maj",[Con "|-",Con "(",Var "P",Con "->",Var "Q",Con ")"],DollarE)
+				,(True, "mp",[Con "|-",Var "Q"],Axiom ["wp", "wq", "min", "maj"] noDisjoints)
+				,(True, "th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem ["tt"] noDisjoints ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"])
+				]
+			)
+		mmComputeTheorem db ["tt"] @?= Right [Con "term", Var "t"]
+		mmComputeTheorem db ["tt", "tze", "tpl"] @?=
+			Right [Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"]
+		mmVerifiesLabel db "th1" @?= Right ()
+		mmVerifiesDatabase db @?= True
 
-	,do {Right (_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesLabel db "a1i" @?= Right ()}
-	,do {Right (_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesLabel db "a2i" @?= Right ()}
 	,do
 		Right (_, db) <- mmParseFromFile "set-part.mm"
+		mmVerifiesLabel db "a1i" @?= Right ()
+		mmVerifiesLabel db "a2i" @?= Right ()
 		let (_, _, _, Theorem _ _ proof) = findStatement db "id"
 		proof @?=
 			["wph","wph","wph","wi","wi"
@@ -193,6 +195,7 @@ testCases =
 			,"wph","wph","wi"
 			,"ax-1","a2i","ax-mp"
 			]
+		mmVerifiesDatabase db @?= True
 	,do
 		Right (_, db) <- mmParseFromFile "set-part2.mm"
 		let (_, _, _, Theorem _ _ proof) = findStatement db "cbvex"
@@ -202,17 +205,14 @@ testCases =
 			,"vy","weq","wph","wps","cbvex.3","negbid","cbval","negbii","wph","vx","df-ex","wps","vy","df-ex"
 			,"3bitr4"
 			]
-
-	,do {Right (_, db) <- mmParseFromFile "peano.mm"; findStatement db "binop_plus" @?= (True, "binop_plus", [Con "BINOP", Con "+"], Axiom [] noDisjoints)}
-	,do {Right (_, db) <- mmParseFromFile "peano.mm"; mmVerifiesDatabase db @?= True}
-
-	,do {Right (_, db) <- mmParseFromFile "set-part.mm"; mmVerifiesDatabase db @?= True}
-
-	,do
-		Right (_, db) <- mmParseFromFile "set-part2.mm"
 		let (_, _, _, Theorem _ disjoints _) = findStatement db "ax17eq"
 		disjoints @?= Disjoints [("x", "z"), ("y", "z")]
-	,do {Right (_, db) <- mmParseFromFile "set-part2.mm"; mmVerifiesLabel db "ax17eq" @?= Right ()}
+		mmVerifiesLabel db "ax17eq" @?= Right ()
+
+	,do
+		Right (_, db) <- mmParseFromFile "peano.mm"
+		findStatement db "binop_plus" @?= (True, "binop_plus", [Con "BINOP", Con "+"], Axiom [] noDisjoints)
+		mmVerifiesDatabase db @?= True
 	]
 
 	]
