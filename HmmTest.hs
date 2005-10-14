@@ -142,6 +142,8 @@ testCases =
 
 	,(case runParser mmpCompressedNumbers ctxEmpty "<test string>" "T UA UB UVA VUA $." of Left _ -> Nothing; Right l -> Just l)
 		@?= Just [(19,False),(20,False),(21,False),(120,False),(200,False)]
+	,(case runParser mmpCompressedNumbers ctxEmpty "<test string>" "T UA UB UUA UUT UVA $." of Left _ -> Nothing; Right l -> Just l)
+		@?= Just [(19,False),(20,False),(21,False),(120,False),(139,False),(140,False)]
 	,(case runParser mmpCompressedNumbers ctxEmpty "<test string>" "AAAB\nZB FAACA FAA\nFC DE $." of Left _ -> Nothing; Right l -> Just l)
 		@?= Just
 		[(0,False),(0,False),(0,False),(1,True ),(1,False)

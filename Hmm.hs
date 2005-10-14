@@ -339,14 +339,23 @@ mmpCompressedProof db mandatoryLabels = do
 						newP = p ++ newSteps
 
 mmpCompressedNumbers :: MMParser [(Int, Bool)]
-mmpCompressedNumbers = manyTill
-		(do
-			n <- mmpCompressedNumber
-			marked <- try ((try mmpSeparator <|> return ()) >> (((oneOf "Z") >> return True) <|> return False))
-			return (n, marked)
-		)
-		(try ((try mmpSeparator <|> return ()) >> string "$."))
+mmpCompressedNumbers = do
+		markedNumbers <- manyTill
+			(do
+				n <- mmpCompressedNumber
+				marked <- try ((try mmpSeparator <|> return ()) >> (((oneOf "Z") >> return True) <|> return False))
+				return (n, marked)
+			)
+			(try ((try mmpSeparator <|> return ()) >> string "$."))
+		-- now we work around a bug in the official Metamath program, which encodes 140 as UVA instead of UUA
+		let numbers = map fst markedNumbers
+		let hackedNumbers = if 140 `elem` numbers && not (120 `elem` numbers)
+					then map (\n -> if n >= 140 then n - 20 else n) numbers
+					else numbers
+		let hackedMarkedNumbers = zip hackedNumbers (map snd markedNumbers)
+		return hackedMarkedNumbers
 
+-- NOTE: this function parses A=0, as opposed to A=1 as in the Metamath book
 mmpCompressedNumber :: MMParser Int
 mmpCompressedNumber = do
 		base5 <- many (do
@@ -355,10 +364,8 @@ mmpCompressedNumber = do
 			)
 		base20 <- do
 			c <- try ((try mmpSeparator <|> return ()) >> satisfy (\c -> 'A' <= c && c <= 'T')) <?> "A...T"
-			return (fromEnum c - fromEnum 'A')
-		let specifiedNumber = foldl (\x y -> x * 5 + y) 0 base5 * 20 + base20
-		let hackedNumber = if specifiedNumber >= 140 then specifiedNumber - 20 else specifiedNumber
-		return hackedNumber
+			return (fromEnum c - fromEnum 'A' + 1)
+		return (foldl (\x y -> x * 5 + y) 0 base5 * 20 + base20 - 1)
 
 mmpBlock :: Database -> MMParser Database
 mmpBlock db = do
