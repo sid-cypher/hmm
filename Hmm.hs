@@ -1,7 +1,7 @@
 {-
 TODO list, roughly in order of preference:
 
- - functionality: check $d statements properly: 
+ - readability: clean up code for handling disjoints
 
  - functionality: verifier should give more detail on what went wrong: no call
    to "error" anymore on any input file (and add tests to check wrong input).
@@ -48,7 +48,7 @@ module Hmm
 where
 
 import Text.ParserCombinators.Parsec
-import Data.List(sort)
+import Data.List(sort,(\\),nub)
 import Data.Char(isSpace,isAscii,isControl)
 
 
@@ -67,7 +67,7 @@ newtype Disjoints = Disjoints [(String,String)]
 	deriving (Show, Ord)
 
 instance Eq Disjoints where
-	Disjoints d1 == Disjoints d2 = sort (map sortPair d1) == sort (map sortPair d2)
+	Disjoints d1 == Disjoints d2 = sort (nub (map sortPair d1)) == sort (nub (map sortPair d2))
 
 data Symbol = Var String | Con String
 	deriving (Eq, Show, Ord)
@@ -415,22 +415,47 @@ mapSymbols ctx = map $ \s ->
 			else error ("Unknown math symbol " ++ s)
 
 
-mmComputeTheorem :: Database -> Proof -> Either String Expression
+mmComputeTheorem :: Database -> Proof -> Either String (Expression, Disjoints)
 mmComputeTheorem db proof = case foldProof db proof combine of
 				Right [th] -> Right th
 				Right stack -> Left ("proof produced not one theorem but stack " ++ show stack)
 				Left err -> Left ("error: " ++ err)
 	where
-		combine :: Statement -> [(Label, Expression)] -> Either String Expression
+		combine :: Statement -> [(Label, (Expression, Disjoints))] -> Either String (Expression, Disjoints)
 		combine stat labSymsList = case subst' of
-						Right _ -> Right newSyms
+						Right _ -> Right (newSyms, Disjoints newDisjointsList)
 						Left err -> Left ("no substitution found: " ++ err)
 			where
-				(_, _, syms, _) = stat
-				subst' = unify (map (\(lab, ss) ->
-					let (expr, _) = findExpressionAndDisjoints db lab in (expr, ss)) labSymsList)
+				(_, _, syms, info) = stat
+				disjoints = case info of
+					Theorem _ (Disjoints d) _ -> d
+					Axiom _ (Disjoints d) -> d
+					_ -> []
+				subst' = unify (map (\(lab, (ss, _)) -> (findExpression db lab, ss)) labSymsList)
 				subst = fromRight subst'
-				newSyms = applySubstitution subst syms
+				newSyms = case labSymsList of [] -> syms; _ -> applySubstitution subst syms
+				disjointsList = concat (map (\(_, (_, Disjoints d)) -> d) labSymsList)
+				newDisjointsList' = disjointsList
+							++ concat [ [(v, w) | v <- varsOf e, w <- varsOf f] |
+								((x, e), (y, f)) <- allPairs subst,
+								sortPair (x, y) `elem` map sortPair disjoints
+								]
+				newDisjointsList = [(x, y) |
+							(x, y) <- newDisjointsList',
+							{-
+							   The following line makes sure that no optional
+							   disjoint variable restrictions are needed for
+							   a proof.  This gives the verifier better
+							   performance, because we don't have to store the
+							   optional restrictions for any assertion.  It
+							   also makes this verifier less strict than
+							   the official Metamath program, which requires
+							   all optional restrictions that are used
+							   thoughout a proof.
+							-}
+							x `elem` varsOf newSyms && y `elem` varsOf newSyms,
+							if x == y then error "disjoint violation" else True
+							]
 
 foldProof :: Show a => Database -> Proof -> (Statement -> [(Label, a)] -> Either String a) -> Either String [a]
 foldProof db labs f = foldProof' db labs f []
@@ -471,27 +496,39 @@ applySubstitution' :: Substitution -> Expression -> Expression
 applySubstitution' _ [] = []
 applySubstitution' subst (Con c : rest) = Con c : applySubstitution' subst rest
 applySubstitution' subst (Var v : rest) =
-	(case lookup v subst of Just ss -> ss; Nothing -> [Var v])
+	(case lookup v subst of Just ss -> ss; Nothing -> error "impossible")
 	++ applySubstitution' subst rest
 
 
 mmVerifiesLabel :: Database -> Label -> Either String ()
-mmVerifiesLabel db lab = case mmVerifiesProof db proof of
+mmVerifiesLabel db lab = case mmVerifiesProof db proof expr disjoints of
 				Left err -> Left ("proof of " ++ show lab ++ ": " ++ err)
 				Right () -> Right ()
 	where
 		stat = findStatement db lab
-		(_, _, _, Theorem _ _ proof) = stat
+		(_, _, expr, Theorem _ disjoints proof) = stat
 
-mmVerifiesProof :: Database -> Proof -> Either String ()
-mmVerifiesProof db proof = case mmComputeTheorem db proof of Right _ -> Right (); Left err -> Left ("failed to verify proof " ++ show proof ++ ":" ++ err)
+mmVerifiesProof :: Database -> Proof -> Expression -> Disjoints -> Either String ()
+mmVerifiesProof db proof expr disjoints = case mmComputeTheorem db proof of
+	Right (cExpr, cDisjoints) -> if cExpr == expr
+					then let
+						violated = sort (nub (map sortPair cD)) \\ sort (nub (map sortPair d))
+						Disjoints cD = cDisjoints
+						Disjoints d = disjoints
+						in if violated == [] 
+							then Right ()
+							else Left ("missing disjoints: " ++ show violated)
+					else Left ("proved " ++ show cExpr ++ " instead of " ++ show expr)
+	Left err -> Left ("failed to verify proof " ++ show proof ++ ":" ++ err)
 
 mmVerifiesAll :: Database -> [(Label, Either String ())]
-mmVerifiesAll db@(Database stats) = map (\(lab, proof) -> (lab, mmVerifiesProof db proof)) (selectProofs stats)
+mmVerifiesAll db@(Database stats) =
+	map (\(lab, proof, expr, disjoints) -> (lab, mmVerifiesProof db proof expr disjoints)) (selectProofs stats)
 	where
-		selectProofs :: [Statement] -> [(Label, Proof)]
+		selectProofs :: [Statement] -> [(Label, Proof, Expression, Disjoints)]
 		selectProofs [] = []
-		selectProofs ((_, lab, _, Theorem _ _ proof):rest) = (lab, proof) : selectProofs rest
+		selectProofs ((_, lab, expr, Theorem _ disjoints proof):rest) =
+			(lab, proof, expr, disjoints) : selectProofs rest
 		selectProofs (_:rest) = selectProofs rest
 
 mmVerifiesDatabase :: Database -> Bool
@@ -503,14 +540,10 @@ findStatement (Database (stat@(_, lab2, _, _):rest)) lab
 	| lab == lab2	= stat
 	| True		= findStatement (Database rest) lab
 
-findExpressionAndDisjoints :: Database -> Label -> (Expression, Disjoints)
-findExpressionAndDisjoints db lab = (syms, disjoints)
+findExpression :: Database -> Label -> Expression
+findExpression db lab = syms
 	where
-		(_, _, syms, info) = findStatement db lab
-		disjoints = case info of
-			Axiom _ d -> d
-			Theorem _ d _ -> d
-			_ -> error "only assertions have disjoints"
+		(_, _, syms, _) = findStatement db lab
 
 getHypotheses :: Statement -> [Label]
 getHypotheses (_, _, _, Axiom hyp _) = hyp
@@ -528,10 +561,7 @@ samePairs = any (\(x,y) -> x == y)
 sortPair :: Ord a => (a, a) -> (a, a)
 sortPair (x,y)	| x <= y = (x,y)
 		| True   = (y,x)
-{-
-subset :: Eq a => [a] -> [a] -> Bool
-subset l m = and [x `elem` m | x <- l]
--}
+
 fromRight :: Show a => Either a b -> b
 fromRight (Right b) = b
 fromRight (Left a) = error ("impossible" ++ show a)

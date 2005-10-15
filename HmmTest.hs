@@ -177,9 +177,9 @@ testCases =
 				,(True, "th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem ["tt"] noDisjoints ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"])
 				]
 			)
-		mmComputeTheorem db ["tt"] @?= Right [Con "term", Var "t"]
+		mmComputeTheorem db ["tt"] @?= Right ([Con "term", Var "t"], noDisjoints)
 		mmComputeTheorem db ["tt", "tze", "tpl"] @?=
-			Right [Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"]
+			Right ([Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"], noDisjoints)
 		mmVerifiesLabel db "th1" @?= Right ()
 		mmVerifiesDatabase db @?= True
 
@@ -211,6 +211,71 @@ testCases =
 		let (_, _, _, Theorem _ disjoints _) = findStatement db "ax17eq"
 		disjoints @?= Disjoints [("x", "z"), ("y", "z")]
 		mmVerifiesLabel db "ax17eq" @?= Right ()
+		mmComputeTheorem db
+			["vz","vx","weq","vz","wal","vz","vy","weq","vz","wal"
+			,"vx","vy","weq","vx","vy","weq","vz","wal","wi","vx"
+			,"vy","vz","ax-12","vx","vy","weq","vz","vx","ax-16","vx"
+			,"vy","weq","vz","vy","ax-16","pm2.61ii"
+			]
+			@?= Right ([Con "|-",Con "(",Var "x",Con "=",Var "y",Con "->",Con "A.",Var "z",Var "x",Con "=",Var "y",Con ")"], Disjoints [("x","z"), ("y","z")])
+
+	,do
+		Right (_, db) <- mmParseFromFile "set-part3.mm"
+		let (_, _, _, Theorem _ disjoints _) = findStatement db "a16g"
+		disjoints @?= Disjoints [("x", "y")]
+		mmComputeTheorem db
+			["vz","vx","weq","vz","wal","vx","vy","weq","vx","wal"
+			,"wph","wph","vz","wal","wi","vx","vy","weq","vx","wal"
+			,"vz","vx","weq","vz","vx","vy","vz","eq5","vx","vy"
+			,"weq","vx","wal","vx","vz","weq","vz","vx","weq","vx"
+			,"vy","weq","vx","wal","vx","vz","weq","vx","vz","weq"
+			,"wn","vx","wal","vx","vz","ax9a","vx","vz","weq","wn"
+			,"vx","vy","ax-16","mt3i","vx","vz","eqcom","syl","19.21ai","vx"
+			,"vy","weq","vx","wal","wph","wph","vx","wal","vz","vx"
+			,"weq","vz","wal","wph","vz","wal","wph","vx","vy","ax-16"
+			,"wph","wph","vz","vx","vz","vx","weq","vz","wal","wph"
+			,"idd","del35","syl9r","mpcom"
+			]
+			@?= Right ([Con "|-",Con "(",Con "A.",Var "x",Var "x",Con "=",Var "y",Con "->",Con "(",Var "ph",Con "->",Con "A.",Var "z",Var "ph",Con ")",Con ")"], Disjoints [("x","y")])
+		mmVerifiesLabel db "a16g" @?= Right ()
+
+	,do
+		Right (_, db) <- mmParseFromFile "set-part4.mm"
+		let (_, _, _, Theorem _ disjoints _) = findStatement db "ddeeq1"
+		disjoints @?= Disjoints [("x","z")]
+		mmComputeTheorem db
+			["vw","vz","weq","vy","vz","weq","vx","vy","vw","vw"
+			,"vz","weq","vx","ax-17","vw","vy","vz","a8b","ddelim"
+			]
+			@?= Right (
+				[Con "|-",Con "(",Con "-.",Con "A.",Var "x",Var "x",Con "=",Var "y"
+					,Con "->",Con "(",Var "y",Con "=",Var "z"
+						,Con "->",Con "A.",Var "x",Var "y",Con "=",Var "z"
+					,Con ")"
+				,Con ")"
+				], Disjoints [("x","z")])
+		mmVerifiesLabel db "ddeeq1" @?= Right ()
+		let (_, _, _, Theorem _ disjoints2 _) = findStatement db "sbal2"
+		disjoints2 @?= Disjoints [("x","z"),("y","z")]
+		mmComputeTheorem db
+			["vx","vy","weq","vx","wal","wn","vy","vz","weq","wph","vx","wal","wi","vy","wal","vy","vz","weq","wph","wi","vy"
+			,"wal","vx","wal","wph","vx","wal","vy","vz","wsb","wph","vy","vz","wsb","vx","wal","vx","vy","weq","vx","wal","wn"
+			,"vy","vz","weq","wph","wi","vx","wal","vy","wal","vy","vz","weq","wph","vx","wal","wi","vy","wal","vy","vz","weq"
+			,"wph","wi","vy","wal","vx","wal","vx","vy","weq","vx","wal","wn","vy","vz","weq","wph","wi","vx","wal","vy","vz"
+			,"weq","wph","vx","wal","wi","vy","vx","vy","vy","eq6","vx","vy","weq","vx","wal","wn","vy","vz","weq","vy","vz","weq"
+			,"vx","wal","wi","vx","wal","vy","vz","weq","wph","wi","vx","wal","vy","vz","weq","wph","vx","wal","wi","wb","vy","vz"
+			,"weq","vy","vz","weq","vx","wal","wi","vx","wal","vx","vy","vx","vx","vy","weq","vx","wal","wn","vy","vz","weq","vy"
+			,"vz","weq","vx","wal","wi","vx","vx","vy","vz","ddeeq1","19.20i","eq6s","vy","vz","weq","wph","vx","19.21g"
+			,"syl","biald","vy","vz","weq","wph","wi","vy","vx","alcom","syl5rbbr","wph","vx","wal","vy","vz","sb6","wph"
+			,"vy","vz","wsb","vy","vz","weq","wph","wi","vy","wal","vx","wph","vy","vz","sb6","bial","3bitr4g"
+			]
+			@?= Right (
+				[Con "|-",Con "(",Con "-.",Con "A.",Var "x",Var "x",Con "=",Var "y"
+					,Con "->",Con "(",Con "[",Var "z",Con "/",Var "y",Con "]",Con "A.",Var "x",Var "ph"
+						,Con "<->",Con "A.",Var "x",Con "[",Var "z",Con "/",Var "y",Con "]",Var "ph"
+					,Con ")"
+				,Con ")"
+ 				], Disjoints [("x","z"),("y","z")])
 
 	,do
 		Right (_, db) <- mmParseFromFile "peano.mm"
