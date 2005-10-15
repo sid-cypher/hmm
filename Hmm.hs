@@ -369,12 +369,12 @@ mmpCompressedNumber = do
 
 mmpBlock :: Database -> MMParser Database
 mmpBlock db = do
-		ctx <- getState
 		mmpTryUnlabeled "${"
 		mmpSeparator
+		ctx <- getState
 		db2 <- mmpStatements db
-		string "$}"
 		setState ctx
+		string "$}"
 		return (deactivateNonAssertions db2)
 	where
 		deactivateNonAssertions :: Database -> Database
