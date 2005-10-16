@@ -1,6 +1,6 @@
 module Main where
 
-import Hmm
+import HmmImpl
 
 import Test.HUnit.Base
 import Test.HUnit.Text
