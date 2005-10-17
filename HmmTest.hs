@@ -6,6 +6,7 @@ import Test.HUnit.Base
 import Test.HUnit.Text
 
 import Text.ParserCombinators.Parsec
+import qualified Data.Set as Set
 
 main :: IO ()
 main = do
@@ -19,7 +20,7 @@ testCases =
 	[
 
 	"string-based tests" ~: test
-	[Disjoints (allPairs ["1","5","3","2"]) @?= Disjoints [("1","2"),("1","5"),("1","3"),("3","5"),("5","2"),("2","3")]
+	[dvrs (allPairs ["1","5","3","2"]) @?= dvrs [("1","2"),("1","5"),("1","3"),("3","5"),("5","2"),("2","3")]
 	
 	,mmParseFromString "" @?= Right (ctxEmpty, Database [])
 	,mmParseFromString " \n  " @?= Right (ctxEmpty, Database [])
@@ -46,10 +47,10 @@ testCases =
 	,mmParseFromString "\n$v x $.\n$v y $.\n$( final comment $)\n" @?= Right (ctxEmpty `ctxWithVariables` ["x", "y"], Database [])
 
 	,mmParseFromString "$d x $." @?= Right (ctxEmpty, Database [])
-	,mmParseFromString "$d x y $." @?= Right (ctxEmpty `ctxWithDisjoints` [("y","x")], Database [])
-	,mmParseFromString "$d a bb ccc $." @?= Right (ctxEmpty `ctxWithDisjoints` [("ccc","a"), ("a","bb"),("bb","ccc")], Database [])
-	,mmParseFromString "$d x y $. $d x z $." @?= Right (ctxEmpty `ctxWithDisjoints` [("y","x"), ("x","z")], Database [])
-	,mmParseFromString "${ $d x y $. $} $d x z $." @?= Right (ctxEmpty `ctxWithDisjoints` [("x","z")], Database [])
+	,mmParseFromString "$d x y $." @?= Right (ctxEmpty `ctxWithDVRs` [("y","x")], Database [])
+	,mmParseFromString "$d a bb ccc $." @?= Right (ctxEmpty `ctxWithDVRs` [("ccc","a"), ("a","bb"),("bb","ccc")], Database [])
+	,mmParseFromString "$d x y $. $d x z $." @?= Right (ctxEmpty `ctxWithDVRs` [("y","x"), ("x","z")], Database [])
+	,mmParseFromString "${ $d x y $. $} $d x z $." @?= Right (ctxEmpty `ctxWithDVRs` [("x","z")], Database [])
 
 	,mmParseFromString "$c var $. $v x $." @?=
 		Right (ctxEmpty `ctxWithConstant` "var" `ctxWithVariable` "x"
@@ -209,7 +210,7 @@ testCases =
 			,"3bitr4"
 			]
 		let (_, _, _, Theorem _ disjoints _) = findStatement db "ax17eq"
-		disjoints @?= Disjoints [("x", "z"), ("y", "z")]
+		disjoints @?= dvrs [("x", "z"), ("y", "z")]
 		mmVerifiesLabel db "ax17eq" @?= Right ()
 		mmComputeTheorem db
 			["vz","vx","weq","vz","wal","vz","vy","weq","vz","wal"
@@ -217,12 +218,12 @@ testCases =
 			,"vy","vz","ax-12","vx","vy","weq","vz","vx","ax-16","vx"
 			,"vy","weq","vz","vy","ax-16","pm2.61ii"
 			]
-			@?= Right ([Con "|-",Con "(",Var "x",Con "=",Var "y",Con "->",Con "A.",Var "z",Var "x",Con "=",Var "y",Con ")"], Disjoints [("x","z"), ("y","z")])
+			@?= Right ([Con "|-",Con "(",Var "x",Con "=",Var "y",Con "->",Con "A.",Var "z",Var "x",Con "=",Var "y",Con ")"], dvrs [("x","z"), ("y","z")])
 
 	,do
 		Right (_, db) <- mmParseFromFile "set-part3.mm"
 		let (_, _, _, Theorem _ disjoints _) = findStatement db "a16g"
-		disjoints @?= Disjoints [("x", "y")]
+		disjoints @?= dvrs [("x", "y")]
 		mmComputeTheorem db
 			["vz","vx","weq","vz","wal","vx","vy","weq","vx","wal"
 			,"wph","wph","vz","wal","wi","vx","vy","weq","vx","wal"
@@ -236,13 +237,13 @@ testCases =
 			,"wph","wph","vz","vx","vz","vx","weq","vz","wal","wph"
 			,"idd","del35","syl9r","mpcom"
 			]
-			@?= Right ([Con "|-",Con "(",Con "A.",Var "x",Var "x",Con "=",Var "y",Con "->",Con "(",Var "ph",Con "->",Con "A.",Var "z",Var "ph",Con ")",Con ")"], Disjoints [("x","y")])
+			@?= Right ([Con "|-",Con "(",Con "A.",Var "x",Var "x",Con "=",Var "y",Con "->",Con "(",Var "ph",Con "->",Con "A.",Var "z",Var "ph",Con ")",Con ")"], dvrs [("x","y")])
 		mmVerifiesLabel db "a16g" @?= Right ()
 
 	,do
 		Right (_, db) <- mmParseFromFile "set-part4.mm"
 		let (_, _, _, Theorem _ disjoints _) = findStatement db "ddeeq1"
-		disjoints @?= Disjoints [("x","z")]
+		disjoints @?= dvrs [("x","z")]
 		mmComputeTheorem db
 			["vw","vz","weq","vy","vz","weq","vx","vy","vw","vw"
 			,"vz","weq","vx","ax-17","vw","vy","vz","a8b","ddelim"
@@ -253,10 +254,10 @@ testCases =
 						,Con "->",Con "A.",Var "x",Var "y",Con "=",Var "z"
 					,Con ")"
 				,Con ")"
-				], Disjoints [("x","z")])
+				], dvrs [("x","z")])
 		mmVerifiesLabel db "ddeeq1" @?= Right ()
 		let (_, _, _, Theorem _ disjoints2 _) = findStatement db "sbal2"
-		disjoints2 @?= Disjoints [("x","z"),("y","z")]
+		disjoints2 @?= dvrs [("x","z"),("y","z")]
 		mmComputeTheorem db
 			["vx","vy","weq","vx","wal","wn","vy","vz","weq","wph","vx","wal","wi","vy","wal","vy","vz","weq","wph","wi","vy"
 			,"wal","vx","wal","wph","vx","wal","vy","vz","wsb","wph","vy","vz","wsb","vx","wal","vx","vy","weq","vx","wal","wn"
@@ -275,7 +276,7 @@ testCases =
 						,Con "<->",Con "A.",Var "x",Con "[",Var "z",Con "/",Var "y",Con "]",Var "ph"
 					,Con ")"
 				,Con ")"
- 				], Disjoints [("x","z"),("y","z")])
+ 				], dvrs [("x","z"),("y","z")])
 
 	,do
 		Right (_, db) <- mmParseFromFile "peano.mm"
@@ -296,5 +297,11 @@ ctx `ctxWithConstant` c = ctx `ctxWithConstants` [c]
 ctxWithVariable :: Context -> String -> Context
 ctx `ctxWithVariable` v = ctx `ctxWithVariables` [v]
 
-noDisjoints :: Disjoints
-noDisjoints = Disjoints []
+noDisjoints :: DVRSet
+noDisjoints = dvrs []
+
+ctxWithDVRs :: Context -> [(String, String)] -> Context
+ctx `ctxWithDVRs` v = ctx `ctxWithDVRSet` dvrs v
+
+dvrs :: [(String, String)] -> DVRSet
+dvrs v = Set.fromList (map (\(x,y) -> DVR x y) v)

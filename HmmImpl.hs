@@ -1,8 +1,6 @@
 {-
 TODO list, roughly in order of preference:
 
- - readability: clean up code for handling disjoints
-
  - functionality: verifier should give more detail on what went wrong: no call
    to "error" anymore on any input file (and add tests to check wrong input).
    Idea: use an 'error stack': error X because Y because Z
@@ -36,7 +34,8 @@ module HmmImpl
 where
 
 import Text.ParserCombinators.Parsec
-import Data.List(sort,(\\),nub)
+import qualified Data.Set as Set
+import Data.List(sort)
 import Data.Char(isSpace,isAscii,isControl)
 
 
@@ -47,15 +46,34 @@ data Database = Database [Statement]
 
 type Statement = (Bool, Label, Expression, StatementInfo)
 
-data StatementInfo = DollarE | DollarF | Axiom [Label] Disjoints | Theorem [Label] Disjoints Proof
+data StatementInfo = DollarE | DollarF | Axiom [Label] DVRSet | Theorem [Label] DVRSet Proof
 	deriving (Eq, Show, Ord)
 
---NOTE: a Disjoints never may contain a pair of identical strings!
-newtype Disjoints = Disjoints [(String,String)]
-	deriving (Show, Ord)
 
-instance Eq Disjoints where
-	Disjoints d1 == Disjoints d2 = sort (nub (map sortPair d1)) == sort (nub (map sortPair d2))
+--NOTE: a DVRSet never may contain two identical strings!
+type DVRSet = Set.Set DVR
+data DVR = DVR String String
+	deriving Show
+
+instance Eq DVR where
+	DVR v1 w1 == DVR v2 w2 = (v1,w1) == (v2,w2) || (v1,w1) == (w2,v2)
+
+instance Ord DVR where
+	DVR v1 w1 <= DVR v2 w2 = (v1 `min` w1, v1 `max` w1) <= (v2 `min` w2, v2 `max` w2)
+
+duplicateDVRs :: DVRSet -> [String]
+duplicateDVRs s = [x | DVR x y <- Set.toList s, x == y]
+
+dvrMapSubst :: Substitution -> DVRSet -> DVRSet
+dvrMapSubst subst s = Set.fromList (concat
+			[ [DVR v w | v <- varsOf e, w <- varsOf f] |
+				((x, e), (y, f)) <- allPairs subst,
+				DVR x y `Set.member` s 
+				])
+
+dvrSelectOnlyVars :: [String] -> DVRSet -> DVRSet
+dvrSelectOnlyVars v s = Set.filter (\(DVR x y) -> x `elem` v && y `elem` v) s
+
 
 data Symbol = Var String | Con String
 	deriving (Eq, Show, Ord)
@@ -70,14 +88,9 @@ dbEmpty = Database []
 dbWith:: Database -> Database -> Database
 Database ss1 `dbWith` Database ss2 = Database (ss1++ss2)
 
-selectMandatoryDisjointsFor :: Expression -> Database -> Context -> Disjoints
-selectMandatoryDisjointsFor symbols db ctx = Disjoints ds
+selectMandatoryDVRSetFor :: Expression -> Database -> Context -> DVRSet
+selectMandatoryDVRSetFor symbols db ctx = dvrSelectOnlyVars mandatoryVars (ctxDVRSet ctx)
 	where
-		ds = [d |
-			d@(x, y) <- case ctxDisjoints ctx of Disjoints ds2 -> ds2,
-			x `elem` mandatoryVars,
-			y `elem` mandatoryVars
-			]
 		mandatoryVars = activeDollarEVars db ++ varsOf symbols
 
 selectMandatoryLabelsForVarsOf :: Expression -> Database -> [Label]
@@ -113,18 +126,17 @@ isAssertion _ = False
 
 
 
-data Context = Context {ctxConstants::[String], ctxVariables::[String], ctxDisjoints::Disjoints}
+data Context = Context {ctxConstants::[String], ctxVariables::[String], ctxDVRSet::DVRSet}
 	deriving Show
 
 instance Eq Context where
 	c1 == c2 =
 		sort (ctxConstants c1) == sort (ctxConstants c2)
 		&& sort (ctxVariables c1) == sort (ctxVariables c2)
-		&& sort (case ctxDisjoints c1 of Disjoints d -> map sortPair d)
-			== sort (case ctxDisjoints c2 of Disjoints d -> map sortPair d)
+		&& ctxDVRSet c1 == ctxDVRSet c2
 
 ctxEmpty :: Context
-ctxEmpty = Context {ctxConstants = [], ctxVariables = [], ctxDisjoints = Disjoints []}
+ctxEmpty = Context {ctxConstants = [], ctxVariables = [], ctxDVRSet = Set.empty}
 
 ctxWithConstants :: Context -> [String] -> Context
 ctx `ctxWithConstants` cs = ctx {ctxConstants = cs ++ ctxConstants ctx}
@@ -132,8 +144,8 @@ ctx `ctxWithConstants` cs = ctx {ctxConstants = cs ++ ctxConstants ctx}
 ctxWithVariables :: Context -> [String] -> Context
 ctx `ctxWithVariables` vs = ctx {ctxVariables = vs ++ ctxVariables ctx}
 
-ctxWithDisjoints :: Context -> [(String, String)] -> Context
-ctx `ctxWithDisjoints` ds = ctx {ctxDisjoints = Disjoints (ds ++ case ctxDisjoints ctx of Disjoints d -> d)}
+ctxWithDVRSet :: Context -> DVRSet -> Context
+ctx `ctxWithDVRSet` ds = ctx {ctxDVRSet = ctxDVRSet ctx `Set.union` ds}
 
 
 
@@ -178,7 +190,7 @@ mmpStatement :: Database -> MMParser Database
 mmpStatement db =
 		(   ((  mmpConstants
 		    <|> mmpVariables
-		    <|> mmpDisjoints
+		    <|> mmpDVRs
 		    ) >> return (Database []))
 		<|> mmpDollarE
 		<|> mmpDollarF
@@ -217,17 +229,18 @@ mmpVariables = do
 		setState (ctx `ctxWithVariables` cs)
 		return ()
 
-mmpDisjoints :: MMParser ()
-mmpDisjoints = do
+mmpDVRs :: MMParser ()
+mmpDVRs = do
 		mmpTryUnlabeled "$d"
 		mmpSeparator
 		d <- mmpSepListEndBy mmpIdentifier "$."
-		let pairs = allPairs d
-		if samePairs pairs
-			then error ("found same variable twice in $d " ++ show d)
-			else return ()
+		let dvrSet = Set.fromList (map (\(x, y) -> DVR x y) (allPairs d))
+		let dup = duplicateDVRs dvrSet
+		if dup == []
+			then return ()
+			else error ("found same variable(s) " ++ show dup ++ " multiple times in $d")
 		ctx <- getState
-		setState (ctx `ctxWithDisjoints` pairs)
+		setState (ctx `ctxWithDVRSet` dvrSet)
 		return ()
 
 mmpDollarE :: MMParser Database
@@ -257,7 +270,7 @@ mmpAxiom db = do
 		ss <- mmpSepListEndBy mmpIdentifier "$."
 		ctx <- getState
 		let symbols = mapSymbols ctx ss
-		return (Database [(True, lab, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db) (selectMandatoryDisjointsFor symbols db ctx))])
+		return (Database [(True, lab, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db) (selectMandatoryDVRSetFor symbols db ctx))])
 
 mmpTheorem :: Database -> MMParser Database
 mmpTheorem db = do
@@ -269,7 +282,7 @@ mmpTheorem db = do
 		let symbols = mapSymbols ctx ss
 		let mandatoryLabels = selectMandatoryLabelsForVarsOf symbols db
 		ps <- (mmpUncompressedProof <|> mmpCompressedProof db mandatoryLabels)
-		return (Database [(True, lab, symbols, Theorem mandatoryLabels (selectMandatoryDisjointsFor symbols db ctx) ps)])
+		return (Database [(True, lab, symbols, Theorem mandatoryLabels (selectMandatoryDVRSetFor symbols db ctx) ps)])
 
 mmpUncompressedProof :: MMParser Proof
 mmpUncompressedProof = do
@@ -403,47 +416,53 @@ mapSymbols ctx = map $ \s ->
 			else error ("Unknown math symbol " ++ s)
 
 
-mmComputeTheorem :: Database -> Proof -> Either String (Expression, Disjoints)
+mmComputeTheorem :: Database -> Proof -> Either String (Expression, DVRSet)
 mmComputeTheorem db proof = case foldProof db proof combine of
 				Right [th] -> Right th
 				Right stack -> Left ("proof produced not one theorem but stack " ++ show stack)
 				Left err -> Left ("error: " ++ err)
 	where
-		combine :: Statement -> [(Label, (Expression, Disjoints))] -> Either String (Expression, Disjoints)
+		combine :: Statement -> [(Label, (Expression, DVRSet))] -> Either String (Expression, DVRSet)
 		combine stat labSymsList = case subst' of
-						Right _ -> Right (newSyms, Disjoints newDisjointsList)
+						Right _ -> if dup == []
+								then Right (newExpr, newDVRSet)
+								else Left ("found duplicate disjoint variable(s) " ++ show dup)
 						Left err -> Left ("no substitution found: " ++ err)
 			where
-				(_, _, syms, info) = stat
-				disjoints = case info of
-					Theorem _ (Disjoints d) _ -> d
-					Axiom _ (Disjoints d) -> d
-					_ -> []
+				(_, _, expr, _) = stat
+				
 				subst' = unify (map (\(lab, (ss, _)) -> (findExpression db lab, ss)) labSymsList)
 				subst = fromRight subst'
-				newSyms = case labSymsList of [] -> syms; _ -> applySubstitution subst syms
-				disjointsList = concat (map (\(_, (_, Disjoints d)) -> d) labSymsList)
-				newDisjointsList' = disjointsList
-							++ concat [ [(v, w) | v <- varsOf e, w <- varsOf f] |
-								((x, e), (y, f)) <- allPairs subst,
-								sortPair (x, y) `elem` map sortPair disjoints
-								]
-				newDisjointsList = [(x, y) |
-							(x, y) <- newDisjointsList',
-							{-
-							   The following line makes sure that no optional
-							   disjoint variable restrictions are needed for
-							   a proof.  This gives the verifier better
-							   performance, because we don't have to store the
-							   optional restrictions for any assertion.  It
-							   also makes this verifier less strict than
-							   the official Metamath program, which requires
-							   all optional restrictions that are used
-							   thoughout a proof.
-							-}
-							x `elem` varsOf newSyms && y `elem` varsOf newSyms,
-							if x == y then error "disjoint violation" else True
-							]
+
+				newExpr = case labSymsList of [] -> expr; _ -> applySubstitution subst expr
+
+				{-
+				   In the following definition we compute the DVRSet on top of the stack as
+				   follows:
+
+				    (1) First we collect all DVRs of the hypotheses that are popped off the
+				    stack.
+
+				    (2) We add the DVRs of the assertion that we are processing, after
+				    applying the substitution to it.
+
+				    (3) We select only those DVRs that occur in the new expression on top
+				    of the stack.
+
+				   The last step makes sure that no optional disjoint variable restrictions
+				   are needed for a proof.  This gives the verifier better performance,
+				   because we don't have to store the optional restrictions for any
+				   assertion.  It also makes this verifier less strict than the official
+				   Metamath program, which requires all optional restrictions that are used
+				   thoughout a proof.
+				-}
+
+				newDVRSet = dvrSelectOnlyVars (varsOf newExpr)
+						(hypDVRSet `Set.union` dvrMapSubst subst (getDVRs stat))
+				hypDVRSet = Set.unions (map (\(_, (_, d)) -> d) labSymsList)
+
+
+				dup = duplicateDVRs newDVRSet
 
 foldProof :: Show a => Database -> Proof -> (Statement -> [(Label, a)] -> Either String a) -> Either String [a]
 foldProof db labs f = foldProof' db labs f []
@@ -489,34 +508,32 @@ applySubstitution' subst (Var v : rest) =
 
 
 mmVerifiesLabel :: Database -> Label -> Either String ()
-mmVerifiesLabel db lab = case mmVerifiesProof db proof expr disjoints of
+mmVerifiesLabel db lab = case mmVerifiesProof db proof expr dvrSet of
 				Left err -> Left ("proof of " ++ show lab ++ ": " ++ err)
 				Right () -> Right ()
 	where
 		stat = findStatement db lab
-		(_, _, expr, Theorem _ disjoints proof) = stat
+		(_, _, expr, Theorem _ dvrSet proof) = stat
 
-mmVerifiesProof :: Database -> Proof -> Expression -> Disjoints -> Either String ()
-mmVerifiesProof db proof expr disjoints = case mmComputeTheorem db proof of
-	Right (cExpr, cDisjoints) -> if cExpr == expr
+mmVerifiesProof :: Database -> Proof -> Expression -> DVRSet -> Either String ()
+mmVerifiesProof db proof expr dvrSet = case mmComputeTheorem db proof of
+	Right (computedExpr, computedDVRSet) -> if computedExpr == expr
 					then let
-						violated = sort (nub (map sortPair cD)) \\ sort (nub (map sortPair d))
-						Disjoints cD = cDisjoints
-						Disjoints d = disjoints
-						in if violated == [] 
+						violated = computedDVRSet `Set.difference` dvrSet
+						in if Set.null violated
 							then Right ()
-							else Left ("missing disjoints: " ++ show violated)
-					else Left ("proved " ++ show cExpr ++ " instead of " ++ show expr)
+							else Left ("missing dvrSet: " ++ show violated)
+					else Left ("proved " ++ show computedExpr ++ " instead of " ++ show expr)
 	Left err -> Left ("failed to verify proof " ++ show proof ++ ":" ++ err)
 
 mmVerifiesAll :: Database -> [(Label, Either String ())]
 mmVerifiesAll db@(Database stats) =
-	map (\(lab, proof, expr, disjoints) -> (lab, mmVerifiesProof db proof expr disjoints)) (selectProofs stats)
+	map (\(lab, proof, expr, dvrSet) -> (lab, mmVerifiesProof db proof expr dvrSet)) (selectProofs stats)
 	where
-		selectProofs :: [Statement] -> [(Label, Proof, Expression, Disjoints)]
+		selectProofs :: [Statement] -> [(Label, Proof, Expression, DVRSet)]
 		selectProofs [] = []
-		selectProofs ((_, lab, expr, Theorem _ disjoints proof):rest) =
-			(lab, proof, expr, disjoints) : selectProofs rest
+		selectProofs ((_, lab, expr, Theorem _ dvrSet proof):rest) =
+			(lab, proof, expr, dvrSet) : selectProofs rest
 		selectProofs (_:rest) = selectProofs rest
 
 mmVerifiesDatabase :: Database -> Bool
@@ -538,17 +555,14 @@ getHypotheses (_, _, _, Axiom hyp _) = hyp
 getHypotheses (_, _, _, Theorem hyp _ _) = hyp
 getHypotheses _ = []
 
+getDVRs :: Statement -> DVRSet
+getDVRs (_, _, _, Axiom _ d) = d
+getDVRs (_, _, _, Theorem _ d _) = d
+getDVRs _ = Set.empty
 
 allPairs :: [a] -> [(a, a)]
 allPairs [] = []
 allPairs (a:as) = [(a, a2) | a2 <- as] ++ allPairs as
-
-samePairs :: Eq a => [(a,a)] -> Bool
-samePairs = any (\(x,y) -> x == y)
-
-sortPair :: Ord a => (a, a) -> (a, a)
-sortPair (x,y)	| x <= y = (x,y)
-		| True   = (y,x)
 
 fromRight :: Show a => Either a b -> b
 fromRight (Right b) = b
