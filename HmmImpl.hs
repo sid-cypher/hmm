@@ -1,9 +1,9 @@
 {-
 TODO list, roughly in order of preference:
 
- - functionality: verifier should give more detail on what went wrong: no call
-   to "error" anymore on any input file (and add tests to check wrong input).
-   Idea: use an 'error stack': error X because Y because Z
+ - functionality: add mmComputeProofTree, together with a ProofTree data
+   type, for use by a future HmmCalc module for computing calculational
+   proofs
 
  - performance: add a Data.Map Label Statement in the Context, to quickly
    find them during parsing of compressed proofs
@@ -13,6 +13,10 @@ TODO list, roughly in order of preference:
 
  - performance: store active variables etc. in the context, instead of looking
    them up every time
+
+ - functionality: verifier should give more detail on what went wrong: no call
+   to "error" anymore on any input file (and add tests to check wrong input).
+   Idea: use an 'error stack': error X because Y because Z
 
  - readability: tuck special try/mmpSeparator stuff in new combinator.
 
