@@ -77,6 +77,9 @@ Thanks to Daan Leijen for Parsec, the beautiful parser library for Haskell.
 Thanks to Dean Herington for creating HUnit, the Haskell Unit Test framework
 that is used for the Hmm unit tests. 
 
+And of course thanks to David Roundy for 'darcs', which enabled me develop
+quickly on three different machines, and moving patches around very easily.
+
 
 License
 -------
