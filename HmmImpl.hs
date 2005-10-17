@@ -347,7 +347,9 @@ mmpCompressedNumbers = do
 				return (n, marked)
 			)
 			(try ((try mmpSeparator <|> return ()) >> string "$."))
-		-- now we work around a bug in the official Metamath program, which encodes 140 as UVA instead of UUA
+		-- now we work around a bug in an earlier version of the
+		-- official Metamath program, which used to encode 140 as UVA
+		-- instead of UUA
 		let numbers = map fst markedNumbers
 		let hackedNumbers = if 140 `elem` numbers && not (120 `elem` numbers)
 					then map (\n -> if n >= 140 then n - 20 else n) numbers
