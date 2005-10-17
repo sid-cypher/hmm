@@ -304,12 +304,12 @@ mmpCompressedProof db mandatoryLabels = do
 				proof = proof' markedNumbers ([], [], [])
 
 				-- The meaning of the accumulated arguments:
-				-- marked: the 1st, 2nd, ... marked subproofs
-				-- subs:   the subproofs ending at the 1st, 2nd, ... number in the list
-				-- p:      the proof resulting from all markedNumbers processed so far
+				-- marked:        the 1st, 2nd, ... marked subproofs
+				-- subproofStack: the stack of subproofs, starting with the top of the stack
+				-- prf:           the proof resulting from all markedNumbers processed so far
 				proof' :: [(Int, Bool)] -> ([Proof], [Proof], Proof) -> Proof
 				proof' [] (_, _, p) = p
-				proof' ((n, mark):rest) (marked, subs, p) = proof' rest (newMarked, newSubs, newP)
+				proof' ((n, mark):rest) (marked, subproofStack, p) = proof' rest (newMarked, newSubproofStack, newPrf)
 					where
 						-- meaning !! n =
 						--	(the subproof associated with number n
@@ -322,22 +322,21 @@ mmpCompressedProof db mandatoryLabels = do
 								assertionLabels
 							++ zip marked (repeat 0)
 
+						nrPopped :: Int
 						newSteps :: Proof
-						newSteps = fst (meaning !! n)
+						(newSteps, nrPopped) = meaning !! n
 
-						newSub :: Proof
-						newSub = concat ((reverse . take (snd (meaning !! n)) . reverse) subs)
-							++ newSteps
+						newSubproof :: Proof
+						newSubproof = concat (reverse (take nrPopped subproofStack)) ++ newSteps
 
 						newMarked :: [Proof]
-						newMarked = if mark then marked ++ [newSub] else marked
+						newMarked = if mark then marked ++ [newSubproof] else marked
 
-						newSubs :: [Proof]
-						newSubs = (reverse . drop (snd (meaning !! n)) . reverse) subs
-							++ [newSub]
+						newSubproofStack :: [Proof]
+						newSubproofStack = newSubproof : drop nrPopped subproofStack
 
-						newP :: Proof
-						newP = p ++ newSteps
+						newPrf :: Proof
+						newPrf = p ++ newSteps
 
 mmpCompressedNumbers :: MMParser [(Int, Bool)]
 mmpCompressedNumbers = do
