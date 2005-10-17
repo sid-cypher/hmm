@@ -14,6 +14,10 @@ theorems and lemmas proven from 17 axioms.
 Hmm has been written as a cleanroom implementation of the Metamath
 specification.
 
+The longer-term goal is to use the Hmm module (which just parses and verifies a
+database) as a basis for a program to generate calculational proofs from
+Metamath proofs.
+
 Hmm was written in Haskell by Marnix Klooster <marnix.klooster@gmail.com>.
 
 
