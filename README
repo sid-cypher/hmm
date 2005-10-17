@@ -36,6 +36,10 @@ configuration management system (www.darcs.net).  Just install darcs and
 This will create a directory 'hmm' with the latest version and the change
 history.
 
+To run Hmm you will need a Haskell implementation.  Hmm was developed using GHC
+6.4 (see http://haskell.org/ghc/), but other Haskell implementations might work
+as well.
+
 
 Release notes
 -------------
