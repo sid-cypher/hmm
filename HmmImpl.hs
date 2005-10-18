@@ -8,9 +8,6 @@ TODO list, roughly in order of preference:
  - performance: add a Data.Map Label Statement in the Context, to quickly
    find them during parsing of compressed proofs
 
- - performance: instead of Labels, store the Statements in the Database
-   structure (i.e., replace lookups by pointers)
-
  - performance: store active variables etc. in the context, instead of looking
    them up every time
 
@@ -50,7 +47,7 @@ data Database = Database [(Bool, Statement)]
 
 type Statement = (Label, Expression, StatementInfo)
 
-data StatementInfo = DollarE | DollarF | Axiom [Label] DVRSet | Theorem [Label] DVRSet Proof
+data StatementInfo = DollarE | DollarF | Axiom [Statement] DVRSet | Theorem [Statement] DVRSet Proof
 	deriving (Eq, Show, Ord)
 
 
@@ -97,10 +94,10 @@ selectMandatoryDVRSetFor symbols db ctx = dvrSelectOnlyVars mandatoryVars (ctxDV
 	where
 		mandatoryVars = activeDollarEVars db ++ varsOf symbols
 
-selectMandatoryLabelsForVarsOf :: Expression -> Database -> [Label]
+selectMandatoryLabelsForVarsOf :: Expression -> Database -> [Statement]
 selectMandatoryLabelsForVarsOf symbols db@(Database ss) =
-	[lab |
-		(act, (lab, syms, info)) <- ss,
+	[stat |
+		(act, stat@(_, syms, info)) <- ss,
 		act,
 		case info of
 			DollarE -> True
@@ -130,7 +127,7 @@ isAssertion _ = False
 
 
 
-data Context = Context {ctxConstants::[String], ctxVariables::[String], ctxDVRSet::DVRSet}
+data Context = Context {ctxConstants::[String], ctxVariables::[String], ctxDVRSet::DVRSet, ctxActiveHyps::[Statement]}
 	deriving Show
 
 instance Eq Context where
@@ -138,9 +135,10 @@ instance Eq Context where
 		sort (ctxConstants c1) == sort (ctxConstants c2)
 		&& sort (ctxVariables c1) == sort (ctxVariables c2)
 		&& ctxDVRSet c1 == ctxDVRSet c2
+		&& ctxActiveHyps c1 == ctxActiveHyps c2
 
 ctxEmpty :: Context
-ctxEmpty = Context {ctxConstants = [], ctxVariables = [], ctxDVRSet = Set.empty}
+ctxEmpty = Context {ctxConstants = [], ctxVariables = [], ctxDVRSet = Set.empty, ctxActiveHyps = []}
 
 ctxWithConstants :: Context -> [String] -> Context
 ctx `ctxWithConstants` cs = ctx {ctxConstants = cs ++ ctxConstants ctx}
@@ -150,6 +148,9 @@ ctx `ctxWithVariables` vs = ctx {ctxVariables = vs ++ ctxVariables ctx}
 
 ctxWithDVRSet :: Context -> DVRSet -> Context
 ctx `ctxWithDVRSet` ds = ctx {ctxDVRSet = ctxDVRSet ctx `Set.union` ds}
+
+ctxWithActiveHyps :: Context -> [Statement] -> Context
+ctx `ctxWithActiveHyps` hs = ctx {ctxActiveHyps = ctxActiveHyps ctx ++ hs}
 
 
 
@@ -292,7 +293,7 @@ mmpUncompressedProof :: MMParser Proof
 mmpUncompressedProof = do
 		mmpSepListEndBy mmpLabel "$."
 
-mmpCompressedProof :: Database -> [Label] -> MMParser Proof
+mmpCompressedProof :: Database -> [Statement] -> MMParser Proof
 mmpCompressedProof db mandatoryLabels = do
 		string "("
 		mmpSeparator
@@ -321,7 +322,7 @@ mmpCompressedProof db mandatoryLabels = do
 						--	)
 						meaning :: [(Proof, Int)]
 						meaning =
-							map (\lab -> ([lab], 0)) mandatoryLabels
+							map (\(lab, _, _) -> ([lab], 0)) mandatoryLabels
 							++ map (\lab -> ([lab], length (getHypotheses (findStatement db lab))))
 								assertionLabels
 							++ zip marked (repeat 0)
@@ -427,7 +428,7 @@ mmComputeTheorem db proof = case foldProof db proof combine of
 				Right stack -> Left ("proof produced not one theorem but stack " ++ show stack)
 				Left err -> Left ("error: " ++ err)
 	where
-		combine :: Statement -> [(Label, (Expression, DVRSet))] -> Either String (Expression, DVRSet)
+		combine :: Statement -> [(Statement, (Expression, DVRSet))] -> Either String (Expression, DVRSet)
 		combine stat labSymsList = case subst' of
 						Right _ -> if dup == []
 								then Right (newExpr, newDVRSet)
@@ -436,7 +437,7 @@ mmComputeTheorem db proof = case foldProof db proof combine of
 			where
 				(_, expr, _) = stat
 				
-				subst' = unify (map (\(lab, (ss, _)) -> (findExpression db lab, ss)) labSymsList)
+				subst' = unify (map (\((_, ex, _), (ss, _)) -> (ex, ss)) labSymsList)
 				subst = fromRight subst'
 
 				newExpr = case labSymsList of [] -> expr; _ -> applySubstitution subst expr
@@ -469,10 +470,10 @@ mmComputeTheorem db proof = case foldProof db proof combine of
 
 				dup = duplicateDVRs newDVRSet
 
-foldProof :: Show a => Database -> Proof -> (Statement -> [(Label, a)] -> Either String a) -> Either String [a]
+foldProof :: Show a => Database -> Proof -> (Statement -> [(Statement, a)] -> Either String a) -> Either String [a]
 foldProof db labs f = foldProof' db labs f []
 
-foldProof' :: Show a => Database -> Proof -> (Statement -> [(Label, a)] -> Either String a) -> [a] -> Either String [a]
+foldProof' :: Show a => Database -> Proof -> (Statement -> [(Statement, a)] -> Either String a) -> [a] -> Either String [a]
 foldProof' _ [] _ stack = Right stack
 foldProof' db (lab:labs) f stack = case newTop' of
 					Left err -> Left ("could not apply assertion " ++ show lab ++ " (" ++ show (length labs + 1) ++ "th from the right in the proof) to the top " ++ show nHyps ++ " stack entries " ++ show pairs ++ ": " ++ err)
@@ -555,7 +556,7 @@ findExpression db lab = syms
 	where
 		(_, syms, _) = findStatement db lab
 
-getHypotheses :: Statement -> [Label]
+getHypotheses :: Statement -> [Statement]
 getHypotheses (_, _, Axiom hyp _) = hyp
 getHypotheses (_, _, Theorem hyp _ _) = hyp
 getHypotheses _ = []
