@@ -45,10 +45,10 @@ import Data.Char(isSpace,isAscii,isControl)
 
 type MMParser a = CharParser Context a
 
-data Database = Database [Statement]
+data Database = Database [(Bool, Statement)]
 	deriving (Eq, Show)
 
-type Statement = (Bool, Label, Expression, StatementInfo)
+type Statement = (Label, Expression, StatementInfo)
 
 data StatementInfo = DollarE | DollarF | Axiom [Label] DVRSet | Theorem [Label] DVRSet Proof
 	deriving (Eq, Show, Ord)
@@ -100,7 +100,7 @@ selectMandatoryDVRSetFor symbols db ctx = dvrSelectOnlyVars mandatoryVars (ctxDV
 selectMandatoryLabelsForVarsOf :: Expression -> Database -> [Label]
 selectMandatoryLabelsForVarsOf symbols db@(Database ss) =
 	[lab |
-		(act, lab, syms, info) <- ss,
+		(act, (lab, syms, info)) <- ss,
 		act,
 		case info of
 			DollarE -> True
@@ -112,7 +112,7 @@ selectMandatoryLabelsForVarsOf symbols db@(Database ss) =
 activeDollarEVars :: Database -> [String]
 activeDollarEVars (Database ss) =
 	concat [varsOf syms |
-		(act, _, syms, info) <- ss,
+		(act, (_, syms, info)) <- ss,
 		act,
 		info == DollarE
 	]
@@ -124,8 +124,8 @@ varsOf (Con _c : rest) = varsOf rest
 
 
 isAssertion :: Statement -> Bool
-isAssertion (_, _, _, Theorem _ _ _) = True
-isAssertion (_, _, _, Axiom _ _) = True
+isAssertion (_, _, Theorem _ _ _) = True
+isAssertion (_, _, Axiom _ _) = True
 isAssertion _ = False
 
 
@@ -253,7 +253,7 @@ mmpDollarE = do
 		mmpSeparator
 		ss <- mmpSepListEndBy mmpIdentifier "$."
 		ctx <- getState
-		return (Database [(True, lab, mapSymbols ctx ss, DollarE)])
+		return (Database [(True, (lab, mapSymbols ctx ss, DollarE))])
 
 mmpDollarF :: MMParser Database
 mmpDollarF = do
@@ -265,7 +265,7 @@ mmpDollarF = do
 		mmpSeparator
 		string "$."
 		ctx <- getState
-		return (Database [(True, lab, mapSymbols ctx [c, v], DollarF)])
+		return (Database [(True, (lab, mapSymbols ctx [c, v], DollarF))])
 
 mmpAxiom :: Database -> MMParser Database
 mmpAxiom db = do
@@ -274,7 +274,7 @@ mmpAxiom db = do
 		ss <- mmpSepListEndBy mmpIdentifier "$."
 		ctx <- getState
 		let symbols = mapSymbols ctx ss
-		return (Database [(True, lab, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db) (selectMandatoryDVRSetFor symbols db ctx))])
+		return (Database [(True, (lab, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db) (selectMandatoryDVRSetFor symbols db ctx)))])
 
 mmpTheorem :: Database -> MMParser Database
 mmpTheorem db = do
@@ -286,7 +286,7 @@ mmpTheorem db = do
 		let symbols = mapSymbols ctx ss
 		let mandatoryLabels = selectMandatoryLabelsForVarsOf symbols db
 		ps <- (mmpUncompressedProof <|> mmpCompressedProof db mandatoryLabels)
-		return (Database [(True, lab, symbols, Theorem mandatoryLabels (selectMandatoryDVRSetFor symbols db ctx) ps)])
+		return (Database [(True, (lab, symbols, Theorem mandatoryLabels (selectMandatoryDVRSetFor symbols db ctx) ps))])
 
 mmpUncompressedProof :: MMParser Proof
 mmpUncompressedProof = do
@@ -386,8 +386,8 @@ mmpBlock db = do
 		deactivateNonAssertions :: Database -> Database
 		deactivateNonAssertions (Database ss) =
 			Database
-				[(newact, lab, symbols, info) |
-					stat@(act, lab, symbols, info) <- ss,
+				[(newact, (lab, symbols, info)) |
+					(act, stat@(lab, symbols, info)) <- ss,
 					let newact = if isAssertion stat then act else False
 				]
 
@@ -434,7 +434,7 @@ mmComputeTheorem db proof = case foldProof db proof combine of
 								else Left ("found duplicate disjoint variable(s) " ++ show dup)
 						Left err -> Left ("no substitution found: " ++ err)
 			where
-				(_, _, expr, _) = stat
+				(_, expr, _) = stat
 				
 				subst' = unify (map (\(lab, (ss, _)) -> (findExpression db lab, ss)) labSymsList)
 				subst = fromRight subst'
@@ -518,7 +518,7 @@ mmVerifiesLabel db lab = case mmVerifiesProof db proof expr dvrSet of
 				Right () -> Right ()
 	where
 		stat = findStatement db lab
-		(_, _, expr, Theorem _ dvrSet proof) = stat
+		(_, expr, Theorem _ dvrSet proof) = stat
 
 mmVerifiesProof :: Database -> Proof -> Expression -> DVRSet -> Either String ()
 mmVerifiesProof db proof expr dvrSet = case mmComputeTheorem db proof of
@@ -533,11 +533,11 @@ mmVerifiesProof db proof expr dvrSet = case mmComputeTheorem db proof of
 
 mmVerifiesAll :: Database -> [(Label, Either String ())]
 mmVerifiesAll db@(Database stats) =
-	map (\(lab, proof, expr, dvrSet) -> (lab, mmVerifiesProof db proof expr dvrSet)) (selectProofs stats)
+	map (\(lab, proof, expr, dvrSet) -> (lab, mmVerifiesProof db proof expr dvrSet)) (selectProofs (map snd stats))
 	where
 		selectProofs :: [Statement] -> [(Label, Proof, Expression, DVRSet)]
 		selectProofs [] = []
-		selectProofs ((_, lab, expr, Theorem _ dvrSet proof):rest) =
+		selectProofs ((lab, expr, Theorem _ dvrSet proof):rest) =
 			(lab, proof, expr, dvrSet) : selectProofs rest
 		selectProofs (_:rest) = selectProofs rest
 
@@ -546,23 +546,23 @@ mmVerifiesDatabase db = all (\(_, res) -> case res of Left _ -> False; Right _ -
 
 findStatement :: Database -> Label -> Statement
 findStatement (Database []) lab = error $ "statement labeled " ++ lab ++ " not found"
-findStatement (Database (stat@(_, lab2, _, _):rest)) lab
+findStatement (Database ((_, stat@(lab2, _, _)):rest)) lab
 	| lab == lab2	= stat
 	| True		= findStatement (Database rest) lab
 
 findExpression :: Database -> Label -> Expression
 findExpression db lab = syms
 	where
-		(_, _, syms, _) = findStatement db lab
+		(_, syms, _) = findStatement db lab
 
 getHypotheses :: Statement -> [Label]
-getHypotheses (_, _, _, Axiom hyp _) = hyp
-getHypotheses (_, _, _, Theorem hyp _ _) = hyp
+getHypotheses (_, _, Axiom hyp _) = hyp
+getHypotheses (_, _, Theorem hyp _ _) = hyp
 getHypotheses _ = []
 
 getDVRs :: Statement -> DVRSet
-getDVRs (_, _, _, Axiom _ d) = d
-getDVRs (_, _, _, Theorem _ d _) = d
+getDVRs (_, _, Axiom _ d) = d
+getDVRs (_, _, Theorem _ d _) = d
 getDVRs _ = Set.empty
 
 allPairs :: [a] -> [(a, a)]
