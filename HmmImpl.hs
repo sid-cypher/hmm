@@ -551,11 +551,6 @@ findStatement (Database ((_, stat@(lab2, _, _)):rest)) lab
 	| lab == lab2	= stat
 	| True		= findStatement (Database rest) lab
 
-findExpression :: Database -> Label -> Expression
-findExpression db lab = syms
-	where
-		(_, syms, _) = findStatement db lab
-
 getHypotheses :: Statement -> [Statement]
 getHypotheses (_, _, Axiom hyp _) = hyp
 getHypotheses (_, _, Theorem hyp _ _) = hyp
