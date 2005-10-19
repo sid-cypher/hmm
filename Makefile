@@ -11,3 +11,8 @@ clean:
 
 check: hmmTest$(EXE)
 	./hmmTest$(EXE)
+
+sitecopy: clean
+	if [[ "${PWD}" != "${HOME}/projects/hmm" ]]; then false; fi
+	echo "Options +Indexes" > .htaccess
+	sitecopy -u hmm-repo
