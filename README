@@ -23,7 +23,7 @@ Hmm was written in Haskell by Marnix Klooster <marnix.klooster@gmail.com>.
 
 Download
 --------
-At the time of writing, Hmm is found on the web at
+At the time of writing, the *development* version of Hmm is found on the web at
 
 	http://www.solcon.nl/mklooster/repos/hmm
 
@@ -36,6 +36,11 @@ configuration management system (www.darcs.net).  Just install darcs and
 This will create a directory 'hmm' with the latest version and the change
 history.
 
+The latest stable version is version 0.1, which can be retrieved using the
+following darcs command:
+
+	darcs get --tag=0.1 http://www.solcon.nl/mklooster/repos/hmm
+
 To run Hmm you will need a Haskell implementation.  Hmm was developed using GHC
 6.4 (see http://haskell.org/ghc/), but other Haskell implementations might work
 as well.
@@ -43,7 +48,7 @@ as well.
 
 Release notes
 -------------
-This is version 0.1, the first public release.  I have no idea whether I will
+Version 0.1 is the first public release.  I have no idea whether I will
 have time to hack further on Hmm in the future, but in any case bug reports,
 patches (preferably using darcs), and comments are welcome.
 
