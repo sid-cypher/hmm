@@ -48,7 +48,9 @@ as well.
 
 Release notes
 -------------
-Version 0.1 is the first public release.  I have no idea whether I will
+This version is a post-0.1 development version.
+
+Version 0.1 was the first public release.  I have no idea whether I will
 have time to hack further on Hmm in the future, but in any case bug reports,
 patches (preferably using darcs), and comments are welcome.
 
