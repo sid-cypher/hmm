@@ -81,7 +81,7 @@ data Symbol = Var String | Con String
 
 type Expression = [Symbol]
 type Label = String
-type Proof = [String]
+type Proof = [Statement]
 
 dbEmpty :: Database
 dbEmpty = Database []
@@ -94,8 +94,8 @@ selectMandatoryDVRSetFor symbols db ctx = dvrSelectOnlyVars mandatoryVars (ctxDV
 	where
 		mandatoryVars = activeDollarEVars db ++ varsOf symbols
 
-selectMandatoryLabelsForVarsOf :: Expression -> Database -> [Statement]
-selectMandatoryLabelsForVarsOf symbols db@(Database ss) =
+selectMandatoryStatementsForVarsOf :: Expression -> Database -> [Statement]
+selectMandatoryStatementsForVarsOf symbols db@(Database ss) =
 	[stat |
 		(act, stat@(_, syms, info)) <- ss,
 		act,
@@ -275,7 +275,8 @@ mmpAxiom db = do
 		ss <- mmpSepListEndBy mmpIdentifier "$."
 		ctx <- getState
 		let symbols = mapSymbols ctx ss
-		return (Database [(True, (lab, symbols, Axiom (selectMandatoryLabelsForVarsOf symbols db) (selectMandatoryDVRSetFor symbols db ctx)))])
+		let mandatoryStatements = selectMandatoryStatementsForVarsOf symbols db
+		return (Database [(True, (lab, symbols, Axiom mandatoryStatements (selectMandatoryDVRSetFor symbols db ctx)))])
 
 mmpTheorem :: Database -> MMParser Database
 mmpTheorem db = do
@@ -285,16 +286,17 @@ mmpTheorem db = do
 		mmpSeparator
 		ctx <- getState
 		let symbols = mapSymbols ctx ss
-		let mandatoryLabels = selectMandatoryLabelsForVarsOf symbols db
-		ps <- (mmpUncompressedProof <|> mmpCompressedProof db mandatoryLabels)
-		return (Database [(True, (lab, symbols, Theorem mandatoryLabels (selectMandatoryDVRSetFor symbols db ctx) ps))])
+		let mandatoryStatements = selectMandatoryStatementsForVarsOf symbols db
+		proof <- (mmpUncompressedProof db <|> mmpCompressedProof db mandatoryStatements)
+		return (Database [(True, (lab, symbols, Theorem mandatoryStatements (selectMandatoryDVRSetFor symbols db ctx) proof))])
 
-mmpUncompressedProof :: MMParser Proof
-mmpUncompressedProof = do
-		mmpSepListEndBy mmpLabel "$."
+mmpUncompressedProof :: Database -> MMParser Proof
+mmpUncompressedProof db = do
+		labelList <- mmpSepListEndBy mmpLabel "$."
+		return (map (findStatement db) labelList)
 
 mmpCompressedProof :: Database -> [Statement] -> MMParser Proof
-mmpCompressedProof db mandatoryLabels = do
+mmpCompressedProof db mandatoryStatements = do
 		string "("
 		mmpSeparator
 		assertionLabels <- mmpSepListEndBy mmpLabel ")"
@@ -322,8 +324,9 @@ mmpCompressedProof db mandatoryLabels = do
 						--	)
 						meaning :: [(Proof, Int)]
 						meaning =
-							map (\(lab, _, _) -> ([lab], 0)) mandatoryLabels
-							++ map (\lab -> ([lab], length (getHypotheses (findStatement db lab))))
+							map (\stat -> ([stat], 0)) mandatoryStatements
+							++ map (\lab -> (let stat = findStatement db lab
+										in ([stat], length (getHypotheses stat))))
 								assertionLabels
 							++ zip marked (repeat 0)
 
@@ -475,11 +478,11 @@ foldProof db labs f = foldProof' db labs f []
 
 foldProof' :: Show a => Database -> Proof -> (Statement -> [(Statement, a)] -> Either String a) -> [a] -> Either String [a]
 foldProof' _ [] _ stack = Right stack
-foldProof' db (lab:labs) f stack = case newTop' of
-					Left err -> Left ("could not apply assertion " ++ show lab ++ " (" ++ show (length labs + 1) ++ "th from the right in the proof) to the top " ++ show nHyps ++ " stack entries " ++ show pairs ++ ": " ++ err)
-					Right newTop -> foldProof' db labs f (newTop:poppedStack)
+foldProof' db (stat:stats) f stack = case newTop' of
+					Left err -> Left ("could not apply assertion " ++ show lab ++ " (" ++ show (length stats + 1) ++ "th from the right in the proof) to the top " ++ show nHyps ++ " stack entries " ++ show pairs ++ ": " ++ err)
+					Right newTop -> foldProof' db stats f (newTop:poppedStack)
 	where
-		stat = findStatement db lab
+		(lab, _, _) = stat
 		hyps = getHypotheses stat
 		nHyps = length hyps
 		poppedStack = drop nHyps stack

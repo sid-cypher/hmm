@@ -79,13 +79,15 @@ testCases =
 		["$c term $."
 		,"$v x $."
 		,"ax-tx $a term x $."
-		,"th-tx $p term x $= tx $."
+		,"th-tx $p term x $= ax-tx $."
 		])
 	 @?=
 		Right (ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x"
-		,Database
-			[(True, (("ax-tx", [Con "term", Var "x"], Axiom [] noDisjoints)))
-			,(True, ("th-tx", [Con "term", Var "x"], Theorem [] noDisjoints ["tx"]))
+		,let
+			axtx = ("ax-tx", [Con "term", Var "x"], Axiom [] noDisjoints)
+		 in Database
+			[(True, axtx)
+			,(True, ("th-tx", [Con "term", Var "x"], Theorem [] noDisjoints [axtx]))
 			]
 		)
 
@@ -166,38 +168,45 @@ testCases =
 	"file-based tests" ~: test
 	[do 
 		result@(Right (_, db)) <- mmParseFromFile "demo0.mm"
+		let
+			tt = ("tt",[Con "term",Var "t"],DollarF)
+			tr = ("tr",[Con "term",Var "r"],DollarF)
+			ts = ("ts",[Con "term",Var "s"],DollarF)
+			wp = ("wp",[Con "wff",Var "P"],DollarF)
+			wq = ("wq",[Con "wff",Var "Q"],DollarF)
+			tze = ("tze",[Con "term",Con "0"],Axiom [] noDisjoints)
+			tpl = ("tpl",[Con "term",Con "(",Var "t",Con "+",Var "r",Con ")"],Axiom [tt, tr] noDisjoints)
+			weq = ("weq",[Con "wff",Var "t",Con "=",Var "r"],Axiom [tt, tr] noDisjoints)
+			wim = ("wim",[Con "wff",Con "(",Var "P",Con "->",Var "Q",Con ")"],Axiom [wp, wq] noDisjoints)
+			a1 = ("a1",[Con "|-",Con "(",Var "t",Con "=",Var "r",Con "->",Con "(",Var "t",Con "=",Var "s",Con "->",Var "r",Con "=",Var "s",Con ")",Con ")"],Axiom [tt, tr, ts] noDisjoints)
+			a2 = ("a2",[Con "|-",Con "(",Var "t",Con "+",Con "0",Con ")",Con "=",Var "t"],Axiom [tt] noDisjoints)
+			min_ = ("min",[Con "|-",Var "P"],DollarE)
+			maj_ = ("maj",[Con "|-",Con "(",Var "P",Con "->",Var "Q",Con ")"],DollarE)
+			mp = ("mp",[Con "|-",Var "Q"],Axiom [wp, wq, min_, maj_] noDisjoints)
 		result @?=
 			Right (ctxEmpty
 				`ctxWithConstants` ["0","+","=","->","(",")","term","wff","|-"]
 				`ctxWithVariables` ["t","r","s","P","Q"]
-			,let
-				tt = ("tt",[Con "term",Var "t"],DollarF)
-				tr = ("tr",[Con "term",Var "r"],DollarF)
-				ts = ("ts",[Con "term",Var "s"],DollarF)
-				wp = ("wp",[Con "wff",Var "P"],DollarF)
-				wq = ("wq",[Con "wff",Var "Q"],DollarF)
-				min_ = ("min",[Con "|-",Var "P"],DollarE)
-				maj_ = ("maj",[Con "|-",Con "(",Var "P",Con "->",Var "Q",Con ")"],DollarE)
-			 in Database
+			,Database
 				[(True, tt)
 				,(True, tr)
 				,(True, ts)
 				,(True, wp)
 				,(True, wq)
-				,(True, ("tze",[Con "term",Con "0"],Axiom [] noDisjoints))
-				,(True, ("tpl",[Con "term",Con "(",Var "t",Con "+",Var "r",Con ")"],Axiom [tt, tr] noDisjoints))
-				,(True, ("weq",[Con "wff",Var "t",Con "=",Var "r"],Axiom [tt, tr] noDisjoints))
-				,(True, ("wim",[Con "wff",Con "(",Var "P",Con "->",Var "Q",Con ")"],Axiom [wp, wq] noDisjoints))
-				,(True, ("a1",[Con "|-",Con "(",Var "t",Con "=",Var "r",Con "->",Con "(",Var "t",Con "=",Var "s",Con "->",Var "r",Con "=",Var "s",Con ")",Con ")"],Axiom [tt, tr, ts] noDisjoints))
-				,(True, ("a2",[Con "|-",Con "(",Var "t",Con "+",Con "0",Con ")",Con "=",Var "t"],Axiom [tt] noDisjoints))
+				,(True, tze)
+				,(True, tpl)
+				,(True, weq)
+				,(True, wim)
+				,(True, a1)
+				,(True, a2)
 				,(False, min_)
 				,(False, maj_)
-				,(True, ("mp",[Con "|-",Var "Q"],Axiom [wp, wq, min_, maj_] noDisjoints))
-				,(True, ("th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem [tt] noDisjoints ["tt","tze","tpl","tt","weq","tt","tt","weq","tt","a2","tt","tze","tpl","tt","weq","tt","tze","tpl","tt","weq","tt","tt","weq","wim","tt","a2","tt","tze","tpl","tt","tt","a1","mp","mp"]))
+				,(True, mp)
+				,(True, ("th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem [tt] noDisjoints [tt,tze,tpl,tt,weq,tt,tt,weq,tt,a2,tt,tze,tpl,tt,weq,tt,tze,tpl,tt,weq,tt,tt,weq,wim,tt,a2,tt,tze,tpl,tt,tt,a1,mp,mp]))
 				]
 			)
-		mmComputeTheorem db ["tt"] @?= Right ([Con "term", Var "t"], noDisjoints)
-		mmComputeTheorem db ["tt", "tze", "tpl"] @?=
+		mmComputeTheorem db [tt] @?= Right ([Con "term", Var "t"], noDisjoints)
+		mmComputeTheorem db [tt, tze, tpl] @?=
 			Right ([Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"], noDisjoints)
 		mmVerifiesLabel db "th1" @?= Right ()
 		mmVerifiesDatabase db @?= True
@@ -207,7 +216,7 @@ testCases =
 		mmVerifiesLabel db "a1i" @?= Right ()
 		mmVerifiesLabel db "a2i" @?= Right ()
 		let (_, _, Theorem _ _ proof) = findStatement db "id"
-		proof @?=
+		map (\(lab, _, _) -> lab) proof @?=
 			["wph","wph","wph","wi","wi"
 			,"wph","wph","wi"
 			,"wph","wph","ax-1","wph"
@@ -221,7 +230,7 @@ testCases =
 	,do
 		Right (_, db) <- mmParseFromFile "set-part2.mm"
 		let (_, _, Theorem _ _ proof) = findStatement db "cbvex"
-		proof @?=
+		map (\(lab, _, _) -> lab) proof @?=
 			["wph","wn","vx","wal","wn","wps","wn","vy","wal","wn","wph","vx","wex","wps","vy","wex","wph","wn","vx","wal","wps"
 			,"wn","vy","wal","wph","wn","wps","wn","vx","vy","wph","vy","cbvex.1","hbne","wps","vx","cbvex.2","hbne","vx"
 			,"vy","weq","wph","wps","cbvex.3","negbid","cbval","negbii","wph","vx","df-ex","wps","vy","df-ex"
@@ -231,11 +240,12 @@ testCases =
 		disjoints @?= dvrs [("x", "z"), ("y", "z")]
 		mmVerifiesLabel db "ax17eq" @?= Right ()
 		mmComputeTheorem db
+			(map (findStatement db)
 			["vz","vx","weq","vz","wal","vz","vy","weq","vz","wal"
 			,"vx","vy","weq","vx","vy","weq","vz","wal","wi","vx"
 			,"vy","vz","ax-12","vx","vy","weq","vz","vx","ax-16","vx"
 			,"vy","weq","vz","vy","ax-16","pm2.61ii"
-			]
+			])
 			@?= Right ([Con "|-",Con "(",Var "x",Con "=",Var "y",Con "->",Con "A.",Var "z",Var "x",Con "=",Var "y",Con ")"], dvrs [("x","z"), ("y","z")])
 
 	,do
@@ -243,6 +253,7 @@ testCases =
 		let (_, _, Theorem _ disjoints _) = findStatement db "a16g"
 		disjoints @?= dvrs [("x", "y")]
 		mmComputeTheorem db
+			(map (findStatement db)
 			["vz","vx","weq","vz","wal","vx","vy","weq","vx","wal"
 			,"wph","wph","vz","wal","wi","vx","vy","weq","vx","wal"
 			,"vz","vx","weq","vz","vx","vy","vz","eq5","vx","vy"
@@ -254,7 +265,7 @@ testCases =
 			,"weq","vz","wal","wph","vz","wal","wph","vx","vy","ax-16"
 			,"wph","wph","vz","vx","vz","vx","weq","vz","wal","wph"
 			,"idd","del35","syl9r","mpcom"
-			]
+			])
 			@?= Right ([Con "|-",Con "(",Con "A.",Var "x",Var "x",Con "=",Var "y",Con "->",Con "(",Var "ph",Con "->",Con "A.",Var "z",Var "ph",Con ")",Con ")"], dvrs [("x","y")])
 		mmVerifiesLabel db "a16g" @?= Right ()
 
@@ -263,9 +274,10 @@ testCases =
 		let (_, _, Theorem _ disjoints _) = findStatement db "ddeeq1"
 		disjoints @?= dvrs [("x","z")]
 		mmComputeTheorem db
+			(map (findStatement db)
 			["vw","vz","weq","vy","vz","weq","vx","vy","vw","vw"
 			,"vz","weq","vx","ax-17","vw","vy","vz","a8b","ddelim"
-			]
+			])
 			@?= Right (
 				[Con "|-",Con "(",Con "-.",Con "A.",Var "x",Var "x",Con "=",Var "y"
 					,Con "->",Con "(",Var "y",Con "=",Var "z"
@@ -277,6 +289,7 @@ testCases =
 		let (_, _, Theorem _ disjoints2 _) = findStatement db "sbal2"
 		disjoints2 @?= dvrs [("x","z"),("y","z")]
 		mmComputeTheorem db
+			(map (findStatement db)
 			["vx","vy","weq","vx","wal","wn","vy","vz","weq","wph","vx","wal","wi","vy","wal","vy","vz","weq","wph","wi","vy"
 			,"wal","vx","wal","wph","vx","wal","vy","vz","wsb","wph","vy","vz","wsb","vx","wal","vx","vy","weq","vx","wal","wn"
 			,"vy","vz","weq","wph","wi","vx","wal","vy","wal","vy","vz","weq","wph","vx","wal","wi","vy","wal","vy","vz","weq"
@@ -287,7 +300,7 @@ testCases =
 			,"vz","weq","vx","wal","wi","vx","vx","vy","vz","ddeeq1","19.20i","eq6s","vy","vz","weq","wph","vx","19.21g"
 			,"syl","biald","vy","vz","weq","wph","wi","vy","vx","alcom","syl5rbbr","wph","vx","wal","vy","vz","sb6","wph"
 			,"vy","vz","wsb","vy","vz","weq","wph","wi","vy","wal","vx","wph","vy","vz","sb6","bial","3bitr4g"
-			]
+			])
 			@?= Right (
 				[Con "|-",Con "(",Con "-.",Con "A.",Var "x",Var "x",Con "=",Var "y"
 					,Con "->",Con "(",Con "[",Var "z",Con "/",Var "y",Con "]",Con "A.",Var "x",Var "ph"
