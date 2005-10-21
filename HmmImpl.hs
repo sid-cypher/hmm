@@ -65,8 +65,8 @@ instance Ord DVR where
 duplicateDVRs :: DVRSet -> [String]
 duplicateDVRs s = [x | DVR x y <- Set.toList s, x == y]
 
-dvrMapSubst :: Substitution -> DVRSet -> DVRSet
-dvrMapSubst subst s = Set.fromList (concat
+dvrApplySubstitution :: Substitution -> DVRSet -> DVRSet
+dvrApplySubstitution subst s = Set.fromList (concat
 			[ [DVR v w | v <- varsOf e, w <- varsOf f] |
 				((x, e), (y, f)) <- allPairs subst,
 				DVR x y `Set.member` s 
@@ -467,7 +467,7 @@ mmComputeTheorem db proof = case foldProof db proof combine of
 				-}
 
 				newDVRSet = dvrSelectOnlyVars (varsOf newExpr)
-						(hypDVRSet `Set.union` dvrMapSubst subst (getDVRs stat))
+						(hypDVRSet `Set.union` dvrApplySubstitution subst (getDVRs stat))
 				hypDVRSet = Set.unions (map (\(_, (_, d)) -> d) labSymsList)
 
 
