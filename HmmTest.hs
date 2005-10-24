@@ -72,7 +72,7 @@ testCases =
 		,Database [(True, ("tx", [Con "term", Var "x"], Axiom [] noDisjoints))]
 		)
 
-	,findStatement (case mmParseFromString "$c term $. $v x $. tx $a term x $." of Right (_, db) -> db; _ -> error "imipossible") "tx" @?=
+	,findStatement (case mmParseFromString "$c term $. $v x $. tx $a term x $." of Right (_, db) -> db; _ -> error "impossible") "tx" @?=
 		("tx", [Con "term", Var "x"], Axiom [] noDisjoints)
 
 	,mmParseFromString (unlines
