@@ -5,9 +5,6 @@ TODO list, roughly in order of preference:
    type, for use by a future HmmCalc module for computing calculational
    proofs
 
- - performance: store active variables etc. in the context, instead of looking
-   them up every time
-
  - functionality: verifier should give more detail on what went wrong: no call
    to "error" anymore on any input file (and add tests to check wrong input).
    Idea: use an 'error stack': error X because Y because Z
@@ -40,7 +37,7 @@ import Data.Char(isSpace,isAscii,isControl)
 
 type MMParser a = CharParser Context a
 
-data Database = Database [(Bool, Statement)]
+data Database = Database [Statement]
 	deriving (Eq, Show)
 
 type Statement = (Label, Expression, StatementInfo)
@@ -87,28 +84,26 @@ dbEmpty = Database []
 dbWith:: Database -> Database -> Database
 Database ss1 `dbWith` Database ss2 = Database (ss1++ss2)
 
-selectMandatoryDVRSetFor :: Expression -> Database -> Context -> DVRSet
-selectMandatoryDVRSetFor symbols db ctx = dvrSelectOnlyVars mandatoryVars (ctxDVRSet ctx)
+selectMandatoryDVRSetFor :: Expression -> Context -> DVRSet
+selectMandatoryDVRSetFor symbols ctx = dvrSelectOnlyVars mandatoryVars (ctxDVRSet ctx)
 	where
-		mandatoryVars = activeDollarEVars db ++ varsOf symbols
+		mandatoryVars = activeDollarEVars ctx ++ varsOf symbols
 
-selectMandatoryStatementsForVarsOf :: Expression -> Database -> [Statement]
-selectMandatoryStatementsForVarsOf symbols db@(Database ss) =
+selectMandatoryStatementsForVarsOf :: Expression -> Context -> [Statement]
+selectMandatoryStatementsForVarsOf symbols ctx =
 	[stat |
-		(act, stat@(_, syms, info)) <- ss,
-		act,
+		stat@(_, syms, info) <- ctxActiveHyps ctx,
 		case info of
 			DollarE -> True
 			DollarF -> let [Con _c, Var v] = syms in
-				v `elem` (activeDollarEVars db ++ varsOf symbols)
-			_ -> False
+				v `elem` (activeDollarEVars ctx ++ varsOf symbols)
+			_ -> error "internal error: non-hypothesis in ctxActiveHyps"
 	]
 
-activeDollarEVars :: Database -> [String]
-activeDollarEVars (Database ss) =
+activeDollarEVars :: Context -> [String]
+activeDollarEVars ctx =
 	concat [varsOf syms |
-		(act, (_, syms, info)) <- ss,
-		act,
+		(_, syms, info) <- ctxActiveHyps ctx,
 		info == DollarE
 	]
 
@@ -190,34 +185,33 @@ mmpDatabase :: MMParser (Context, Database)
 mmpDatabase = do
 		try mmpSeparator <|> return ()
 		setState ctxEmpty
-		db <- mmpStatements dbEmpty
+		db <- mmpStatements
 		eof
 		ctx <- getState
 		return (ctx, db)
 
-mmpStatements :: Database -> MMParser Database
-mmpStatements db =
+mmpStatements :: MMParser Database
+mmpStatements =
 		do
-			dbstat <- mmpStatement db
-			let db2 = db `dbWith` dbstat
+			dbstat <- mmpStatement
 			(do
 				mmpSeparator
-				dbstats <- mmpStatements db2
+				dbstats <- mmpStatements
 				return (dbstat `dbWith` dbstats)
 			 <|> return dbstat)
 		<|> return dbEmpty
 
-mmpStatement :: Database -> MMParser Database
-mmpStatement db =
+mmpStatement :: MMParser Database
+mmpStatement =
 		(   ((  mmpConstants
 		    <|> mmpVariables
 		    <|> mmpDVRs
 		    ) >> return (Database []))
 		<|> mmpDollarE
 		<|> mmpDollarF
-		<|> mmpAxiom db
-		<|> mmpTheorem db
-		<|> mmpBlock db
+		<|> mmpAxiom
+		<|> mmpTheorem
+		<|> mmpBlock
 		) <?> "statement"
 
 mmpSeparator :: MMParser ()
@@ -271,8 +265,8 @@ mmpDollarE = do
 		ss <- mmpSepListEndBy mmpIdentifier "$."
 		ctx <- getState
 		let stat = (lab, mapSymbols ctx ss, DollarE)
-		setState (ctx `ctxWithStatement` stat)
-		return (Database [(True, stat)])
+		setState (ctx `ctxWithStatement` stat `ctxWithActiveHyps` [stat])
+		return (Database [stat])
 
 mmpDollarF :: MMParser Database
 mmpDollarF = do
@@ -285,34 +279,34 @@ mmpDollarF = do
 		string "$."
 		ctx <- getState
 		let stat = (lab, mapSymbols ctx [c, v], DollarF)
-		setState (ctx `ctxWithStatement` stat)
-		return (Database [(True, stat)])
+		setState (ctx `ctxWithStatement` stat `ctxWithActiveHyps` [stat])
+		return (Database [stat])
 
-mmpAxiom :: Database -> MMParser Database
-mmpAxiom db = do
+mmpAxiom :: MMParser Database
+mmpAxiom = do
 		lab <- mmpTryLabeled "$a"
 		mmpSeparator
 		ss <- mmpSepListEndBy mmpIdentifier "$."
 		ctx <- getState
 		let symbols = mapSymbols ctx ss
-		let mandatoryStatements = selectMandatoryStatementsForVarsOf symbols db
-		let stat = (lab, symbols, Axiom mandatoryStatements (selectMandatoryDVRSetFor symbols db ctx))
+		let mandatoryStatements = selectMandatoryStatementsForVarsOf symbols ctx
+		let stat = (lab, symbols, Axiom mandatoryStatements (selectMandatoryDVRSetFor symbols ctx))
 		setState (ctx `ctxWithStatement` stat)
-		return (Database [(True, stat)])
+		return (Database [stat])
 
-mmpTheorem :: Database -> MMParser Database
-mmpTheorem db = do
+mmpTheorem :: MMParser Database
+mmpTheorem = do
 		lab <- mmpTryLabeled "$p"
 		mmpSeparator
 		ss <- mmpSepListEndBy mmpIdentifier "$="
 		mmpSeparator
 		ctx <- getState
 		let symbols = mapSymbols ctx ss
-		let mandatoryStatements = selectMandatoryStatementsForVarsOf symbols db
+		let mandatoryStatements = selectMandatoryStatementsForVarsOf symbols ctx
 		proof <- (mmpUncompressedProof <|> mmpCompressedProof mandatoryStatements)
-		let stat = (lab, symbols, Theorem mandatoryStatements (selectMandatoryDVRSetFor symbols db ctx) proof)
+		let stat = (lab, symbols, Theorem mandatoryStatements (selectMandatoryDVRSetFor symbols ctx) proof)
 		setState (ctx `ctxWithStatement` stat)
-		return (Database [(True, stat)])
+		return (Database [stat])
 
 mmpUncompressedProof :: MMParser Proof
 mmpUncompressedProof = do
@@ -403,23 +397,16 @@ mmpCompressedNumber = do
 			return (fromEnum c - fromEnum 'A' + 1)
 		return (foldl (\x y -> x * 5 + y) 0 base5 * 20 + base20 - 1)
 
-mmpBlock :: Database -> MMParser Database
-mmpBlock db = do
+mmpBlock :: MMParser Database
+mmpBlock = do
 		mmpTryUnlabeled "${"
 		mmpSeparator
 		ctx <- getState
-		db2 <- mmpStatements db
-		setState (ctx `ctxWithStatements` filter isAssertion (case db2 of Database d -> map snd d))
+		db <- mmpStatements
+		let assertions = filter isAssertion (case db of Database d -> d)
+		setState (ctx `ctxWithStatements` assertions)
 		string "$}"
-		return (deactivateNonAssertions db2)
-	where
-		deactivateNonAssertions :: Database -> Database
-		deactivateNonAssertions (Database ss) =
-			Database
-				[(newact, (lab, symbols, info)) |
-					(act, stat@(lab, symbols, info)) <- ss,
-					let newact = if isAssertion stat then act else False
-				]
+		return (Database assertions)
 
 mmpTryUnlabeled :: String -> MMParser ()
 mmpTryUnlabeled keyword = (try (string keyword) >> return ()) <?> (keyword ++ " keyword")
@@ -563,7 +550,7 @@ mmVerifiesProof db proof expr dvrSet = case mmComputeTheorem db proof of
 
 mmVerifiesAll :: Database -> [(Label, Either String ())]
 mmVerifiesAll db@(Database stats) =
-	map (\(lab, proof, expr, dvrSet) -> (lab, mmVerifiesProof db proof expr dvrSet)) (selectProofs (map snd stats))
+	map (\(lab, proof, expr, dvrSet) -> (lab, mmVerifiesProof db proof expr dvrSet)) (selectProofs stats)
 	where
 		selectProofs :: [Statement] -> [(Label, Proof, Expression, DVRSet)]
 		selectProofs [] = []
@@ -576,7 +563,7 @@ mmVerifiesDatabase db = all (\(_, res) -> case res of Left _ -> False; Right _ -
 
 findStatement :: Database -> Label -> Statement
 findStatement (Database []) lab = error $ "statement labeled " ++ lab ++ " not found in database"
-findStatement (Database ((_, stat@(lab2, _, _)):rest)) lab
+findStatement (Database (stat@(lab2, _, _):rest)) lab
 	| lab == lab2	= stat
 	| True		= findStatement (Database rest) lab
 

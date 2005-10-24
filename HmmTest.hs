@@ -60,19 +60,21 @@ testCases =
 	,mmParseFromString "$c |- $. $v P $. assume-p $e |- P $." @?=
 		let dollarE = ("assume-p", [Con "|-", Var "P"], DollarE)
 		in Right (ctxEmpty `ctxWithConstant` "|-" `ctxWithVariable` "P" `ctxWithStatement` dollarE
-		,Database [(True, dollarE)]
+				`ctxWithActiveHyps` [dollarE]
+		,Database [dollarE]
 		)
 
 	,mmParseFromString "$c var $. $v x $. vx $f var x $." @?=
 		let vx = ("vx", [Con "var", Var "x"], DollarF)
 		in Right (ctxEmpty `ctxWithConstant` "var" `ctxWithVariable` "x" `ctxWithStatement` vx
-		,Database [(True, vx)]
+				`ctxWithActiveHyps` [vx]
+		,Database [vx]
 		)
 
 	,mmParseFromString "$c term $. $v x $. tx $a term x $." @?=
 		let tx = ("tx", [Con "term", Var "x"], Axiom [] noDisjoints)
 		in Right (ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x" `ctxWithStatement` tx
-		,Database [(True, tx)]
+		,Database [tx]
 		)
 
 	,findStatement (case mmParseFromString "$c term $. $v x $. tx $a term x $." of Right (_, db) -> db; _ -> error "impossible") "tx" @?=
@@ -89,10 +91,7 @@ testCases =
 			axtx = ("ax-tx", [Con "term", Var "x"], Axiom [] noDisjoints)
 			thtx = ("th-tx", [Con "term", Var "x"], Theorem [] noDisjoints [axtx])
 		in Right (ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x" `ctxWithStatements` [axtx, thtx]
-		,Database
-			[(True, axtx)
-			,(True, thtx)
-			]
+		,Database [axtx, thtx]
 		)
 
 	,mmParseFromString "${ $}" @?= Right (ctxEmpty,Database [])
@@ -116,12 +115,7 @@ testCases =
 		 `ctxWithConstants` ["|-", "(", ")", "->"]
 		 `ctxWithVariables` ["P", "Q"]
 		 `ctxWithStatements` [mp]
-		,Database
-			[(False, ("dummy", [Con "|-", Var "P"], DollarF))
-			,(False, min_)
-			,(False, maj_)
-			,(True, mp)
-			]
+		,Database [mp]
 		)
 
 	,mmParseFromString (unlines
@@ -142,7 +136,6 @@ testCases =
 			wffp = ("wffp", [Con "wff", Var "P"], DollarF)
 			wffq = ("wffq", [Con "wff", Var "Q"], DollarF)
 			wffr = ("wffr", [Con "wff", Var "R"], DollarF)
-			wffs = ("wffs", [Con "wff", Var "S"], DollarF)
 			min_ = ("min", [Con "|-", Var "P"], DollarE)
 			maj_ = ("maj", [Con "|-", Var "Q"], DollarE)
 			mp = ("mp", [Con "|-", Var "P", Var "R"], Axiom [wffp, wffq, wffr, min_, maj_] noDisjoints)
@@ -150,15 +143,7 @@ testCases =
 		 `ctxWithConstants` ["wff", "|-"]
 		 `ctxWithVariables` ["P", "Q", "R", "S"]
 		 `ctxWithStatements` [mp]
-		,Database
-			[(False, wffp)
-			,(False, wffq)
-			,(False, wffr)
-			,(False, wffs)
-			,(False, min_)
-			,(False, maj_)
-			,(True, mp)
-			]
+		,Database [mp]
 		)
 
 	,(case runParser mmpCompressedNumbers ctxEmpty "<test string>" "T UA UB UVA VUA $." of Left _ -> Nothing; Right l -> Just l)
@@ -197,23 +182,8 @@ testCases =
 				`ctxWithConstants` ["0","+","=","->","(",")","term","wff","|-"]
 				`ctxWithVariables` ["t","r","s","P","Q"]
 				`ctxWithStatements` [tt,tr,ts,wp,wq,tze,tpl,weq,wim,a1,a2,mp,th1]
-			,Database
-				[(True, tt)
-				,(True, tr)
-				,(True, ts)
-				,(True, wp)
-				,(True, wq)
-				,(True, tze)
-				,(True, tpl)
-				,(True, weq)
-				,(True, wim)
-				,(True, a1)
-				,(True, a2)
-				,(False, min_)
-				,(False, maj_)
-				,(True, mp)
-				,(True, th1)
-				]
+				`ctxWithActiveHyps` [tt,tr,ts,wp,wq]
+			,Database [tt,tr,ts,wp,wq,tze,tpl,weq,wim,a1,a2,mp,th1]
 			)
 		mmComputeTheorem db [tt] @?= Right ([Con "term", Var "t"], noDisjoints)
 		mmComputeTheorem db [tt, tze, tpl] @?=
