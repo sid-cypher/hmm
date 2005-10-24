@@ -308,6 +308,7 @@ testCases =
 					,Con ")"
 				,Con ")"
  				], dvrs [("x","z"),("y","z")])
+		mmVerifiesDatabase db @?= True
 
 	,do
 		Right (_, db) <- mmParseFromFile "peano.mm"
