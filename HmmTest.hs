@@ -58,18 +58,21 @@ testCases =
 		)
 
 	,mmParseFromString "$c |- $. $v P $. assume-p $e |- P $." @?=
-		Right (ctxEmpty `ctxWithConstant` "|-" `ctxWithVariable` "P"
-		,Database [(True, ("assume-p", [Con "|-", Var "P"], DollarE))]
+		let dollarE = ("assume-p", [Con "|-", Var "P"], DollarE)
+		in Right (ctxEmpty `ctxWithConstant` "|-" `ctxWithVariable` "P" `ctxWithStatement` dollarE
+		,Database [(True, dollarE)]
 		)
 
 	,mmParseFromString "$c var $. $v x $. vx $f var x $." @?=
-		Right (ctxEmpty `ctxWithConstant` "var" `ctxWithVariable` "x"
-		,Database [(True, ("vx", [Con "var", Var "x"], DollarF))]
+		let vx = ("vx", [Con "var", Var "x"], DollarF)
+		in Right (ctxEmpty `ctxWithConstant` "var" `ctxWithVariable` "x" `ctxWithStatement` vx
+		,Database [(True, vx)]
 		)
 
 	,mmParseFromString "$c term $. $v x $. tx $a term x $." @?=
-		Right (ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x"
-		,Database [(True, ("tx", [Con "term", Var "x"], Axiom [] noDisjoints))]
+		let tx = ("tx", [Con "term", Var "x"], Axiom [] noDisjoints)
+		in Right (ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x" `ctxWithStatement` tx
+		,Database [(True, tx)]
 		)
 
 	,findStatement (case mmParseFromString "$c term $. $v x $. tx $a term x $." of Right (_, db) -> db; _ -> error "impossible") "tx" @?=
@@ -82,12 +85,13 @@ testCases =
 		,"th-tx $p term x $= ax-tx $."
 		])
 	 @?=
-		Right (ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x"
-		,let
+		let
 			axtx = ("ax-tx", [Con "term", Var "x"], Axiom [] noDisjoints)
-		 in Database
+			thtx = ("th-tx", [Con "term", Var "x"], Theorem [] noDisjoints [axtx])
+		in Right (ctxEmpty `ctxWithConstant` "term" `ctxWithVariable` "x" `ctxWithStatements` [axtx, thtx]
+		,Database
 			[(True, axtx)
-			,(True, ("th-tx", [Con "term", Var "x"], Theorem [] noDisjoints [axtx]))
+			,(True, thtx)
 			]
 		)
 
@@ -104,17 +108,19 @@ testCases =
 		,"$}"
 		])
 	 @?=
-		Right (ctxEmpty
-		 `ctxWithConstants` ["|-", "(", ")", "->"]
-		 `ctxWithVariables` ["P", "Q"]
-		,let
+		let
 			min_ = ("min", [Con "|-", Var "P"], DollarE)
 			maj_ = ("maj", [Con "|-", Con "(", Var "P", Con "->", Var "Q", Con ")"], DollarE)
-		 in Database
+			mp = ("mp", [Con "|-", Var "Q"], Axiom [min_, maj_] noDisjoints)
+		in Right (ctxEmpty
+		 `ctxWithConstants` ["|-", "(", ")", "->"]
+		 `ctxWithVariables` ["P", "Q"]
+		 `ctxWithStatements` [mp]
+		,Database
 			[(False, ("dummy", [Con "|-", Var "P"], DollarF))
 			,(False, min_)
 			,(False, maj_)
-			,(True, ("mp", [Con "|-", Var "Q"], Axiom [min_, maj_] noDisjoints))
+			,(True, mp)
 			]
 		)
 
@@ -132,24 +138,26 @@ testCases =
 		,"$}"
 		])
 	 @?=
-		Right (ctxEmpty
-		 `ctxWithConstants` ["wff", "|-"]
-		 `ctxWithVariables` ["P", "Q", "R", "S"]
-		,let
+		let
 			wffp = ("wffp", [Con "wff", Var "P"], DollarF)
 			wffq = ("wffq", [Con "wff", Var "Q"], DollarF)
 			wffr = ("wffr", [Con "wff", Var "R"], DollarF)
 			wffs = ("wffs", [Con "wff", Var "S"], DollarF)
 			min_ = ("min", [Con "|-", Var "P"], DollarE)
 			maj_ = ("maj", [Con "|-", Var "Q"], DollarE)
-		 in Database
+			mp = ("mp", [Con "|-", Var "P", Var "R"], Axiom [wffp, wffq, wffr, min_, maj_] noDisjoints)
+		in Right (ctxEmpty
+		 `ctxWithConstants` ["wff", "|-"]
+		 `ctxWithVariables` ["P", "Q", "R", "S"]
+		 `ctxWithStatements` [mp]
+		,Database
 			[(False, wffp)
 			,(False, wffq)
 			,(False, wffr)
 			,(False, wffs)
 			,(False, min_)
 			,(False, maj_)
-			,(True, ("mp", [Con "|-", Var "P", Var "R"], Axiom [wffp, wffq, wffr, min_, maj_] noDisjoints))
+			,(True, mp)
 			]
 		)
 
@@ -183,10 +191,12 @@ testCases =
 			min_ = ("min",[Con "|-",Var "P"],DollarE)
 			maj_ = ("maj",[Con "|-",Con "(",Var "P",Con "->",Var "Q",Con ")"],DollarE)
 			mp = ("mp",[Con "|-",Var "Q"],Axiom [wp, wq, min_, maj_] noDisjoints)
+			th1 = ("th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem [tt] noDisjoints [tt,tze,tpl,tt,weq,tt,tt,weq,tt,a2,tt,tze,tpl,tt,weq,tt,tze,tpl,tt,weq,tt,tt,weq,wim,tt,a2,tt,tze,tpl,tt,tt,a1,mp,mp])
 		result @?=
 			Right (ctxEmpty
 				`ctxWithConstants` ["0","+","=","->","(",")","term","wff","|-"]
 				`ctxWithVariables` ["t","r","s","P","Q"]
+				`ctxWithStatements` [tt,tr,ts,wp,wq,tze,tpl,weq,wim,a1,a2,mp,th1]
 			,Database
 				[(True, tt)
 				,(True, tr)
@@ -202,7 +212,7 @@ testCases =
 				,(False, min_)
 				,(False, maj_)
 				,(True, mp)
-				,(True, ("th1",[Con "|-",Var "t",Con "=",Var "t"],Theorem [tt] noDisjoints [tt,tze,tpl,tt,weq,tt,tt,weq,tt,a2,tt,tze,tpl,tt,weq,tt,tze,tpl,tt,weq,tt,tt,weq,wim,tt,a2,tt,tze,tpl,tt,tt,a1,mp,mp]))
+				,(True, th1)
 				]
 			)
 		mmComputeTheorem db [tt] @?= Right ([Con "term", Var "t"], noDisjoints)

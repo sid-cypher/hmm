@@ -5,9 +5,6 @@ TODO list, roughly in order of preference:
    type, for use by a future HmmCalc module for computing calculational
    proofs
 
- - performance: add a Data.Map Label Statement in the Context, to quickly
-   find them during parsing of compressed proofs
-
  - performance: store active variables etc. in the context, instead of looking
    them up every time
 
@@ -36,6 +33,7 @@ where
 
 import Text.ParserCombinators.Parsec
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Data.List(sort)
 import Data.Char(isSpace,isAscii,isControl)
 
@@ -127,7 +125,13 @@ isAssertion _ = False
 
 
 
-data Context = Context {ctxConstants::[String], ctxVariables::[String], ctxDVRSet::DVRSet, ctxActiveHyps::[Statement]}
+data Context = Context
+	{ctxConstants :: [String]
+	,ctxVariables :: [String]
+	,ctxDVRSet :: DVRSet
+	,ctxActiveHyps :: [Statement]
+	,ctxActiveStatements :: Map.Map Label Statement
+	}
 	deriving Show
 
 instance Eq Context where
@@ -136,9 +140,16 @@ instance Eq Context where
 		&& sort (ctxVariables c1) == sort (ctxVariables c2)
 		&& ctxDVRSet c1 == ctxDVRSet c2
 		&& ctxActiveHyps c1 == ctxActiveHyps c2
+		&& ctxActiveStatements c1 == ctxActiveStatements c2
 
 ctxEmpty :: Context
-ctxEmpty = Context {ctxConstants = [], ctxVariables = [], ctxDVRSet = Set.empty, ctxActiveHyps = []}
+ctxEmpty = Context
+	{ctxConstants = []
+	,ctxVariables = []
+	,ctxDVRSet = Set.empty
+	,ctxActiveHyps = []
+	,ctxActiveStatements = Map.empty
+	}
 
 ctxWithConstants :: Context -> [String] -> Context
 ctx `ctxWithConstants` cs = ctx {ctxConstants = cs ++ ctxConstants ctx}
@@ -152,6 +163,11 @@ ctx `ctxWithDVRSet` ds = ctx {ctxDVRSet = ctxDVRSet ctx `Set.union` ds}
 ctxWithActiveHyps :: Context -> [Statement] -> Context
 ctx `ctxWithActiveHyps` hs = ctx {ctxActiveHyps = ctxActiveHyps ctx ++ hs}
 
+ctxWithStatement :: Context -> Statement -> Context
+ctx `ctxWithStatement` s@(l, _, _) = ctx {ctxActiveStatements = Map.insert l s (ctxActiveStatements ctx)}
+
+ctxWithStatements :: Context -> [Statement] -> Context
+ctxWithStatements ctx ss = foldl ctxWithStatement ctx ss
 
 
 
@@ -254,7 +270,9 @@ mmpDollarE = do
 		mmpSeparator
 		ss <- mmpSepListEndBy mmpIdentifier "$."
 		ctx <- getState
-		return (Database [(True, (lab, mapSymbols ctx ss, DollarE))])
+		let stat = (lab, mapSymbols ctx ss, DollarE)
+		setState (ctx `ctxWithStatement` stat)
+		return (Database [(True, stat)])
 
 mmpDollarF :: MMParser Database
 mmpDollarF = do
@@ -266,7 +284,9 @@ mmpDollarF = do
 		mmpSeparator
 		string "$."
 		ctx <- getState
-		return (Database [(True, (lab, mapSymbols ctx [c, v], DollarF))])
+		let stat = (lab, mapSymbols ctx [c, v], DollarF)
+		setState (ctx `ctxWithStatement` stat)
+		return (Database [(True, stat)])
 
 mmpAxiom :: Database -> MMParser Database
 mmpAxiom db = do
@@ -276,7 +296,9 @@ mmpAxiom db = do
 		ctx <- getState
 		let symbols = mapSymbols ctx ss
 		let mandatoryStatements = selectMandatoryStatementsForVarsOf symbols db
-		return (Database [(True, (lab, symbols, Axiom mandatoryStatements (selectMandatoryDVRSetFor symbols db ctx)))])
+		let stat = (lab, symbols, Axiom mandatoryStatements (selectMandatoryDVRSetFor symbols db ctx))
+		setState (ctx `ctxWithStatement` stat)
+		return (Database [(True, stat)])
 
 mmpTheorem :: Database -> MMParser Database
 mmpTheorem db = do
@@ -287,25 +309,29 @@ mmpTheorem db = do
 		ctx <- getState
 		let symbols = mapSymbols ctx ss
 		let mandatoryStatements = selectMandatoryStatementsForVarsOf symbols db
-		proof <- (mmpUncompressedProof db <|> mmpCompressedProof db mandatoryStatements)
-		return (Database [(True, (lab, symbols, Theorem mandatoryStatements (selectMandatoryDVRSetFor symbols db ctx) proof))])
+		proof <- (mmpUncompressedProof <|> mmpCompressedProof mandatoryStatements)
+		let stat = (lab, symbols, Theorem mandatoryStatements (selectMandatoryDVRSetFor symbols db ctx) proof)
+		setState (ctx `ctxWithStatement` stat)
+		return (Database [(True, stat)])
 
-mmpUncompressedProof :: Database -> MMParser Proof
-mmpUncompressedProof db = do
+mmpUncompressedProof :: MMParser Proof
+mmpUncompressedProof = do
 		labelList <- mmpSepListEndBy mmpLabel "$."
-		return (map (findStatement db) labelList)
+		ctx <- getState
+		return (map (findActiveStatement ctx) labelList)
 
-mmpCompressedProof :: Database -> [Statement] -> MMParser Proof
-mmpCompressedProof db mandatoryStatements = do
+mmpCompressedProof :: [Statement] -> MMParser Proof
+mmpCompressedProof mandatoryStatements = do
 		string "("
 		mmpSeparator
 		assertionLabels <- mmpSepListEndBy mmpLabel ")"
 		mmpSeparator
 		markedNumbers <- mmpCompressedNumbers
-		return (createProof assertionLabels markedNumbers)
+		ctx <- getState
+		return (createProof assertionLabels markedNumbers ctx)
 	where
-		createProof :: [Label] -> [(Int,Bool)] -> Proof
-		createProof assertionLabels markedNumbers = proof
+		createProof :: [Label] -> [(Int,Bool)] -> Context -> Proof
+		createProof assertionLabels markedNumbers ctx2 = proof
 			where
 				proof :: Proof
 				proof = proof' markedNumbers ([], [], [])
@@ -325,7 +351,7 @@ mmpCompressedProof db mandatoryStatements = do
 						meaning :: [(Proof, Int)]
 						meaning =
 							map (\stat -> ([stat], 0)) mandatoryStatements
-							++ map (\lab -> (let stat = findStatement db lab
+							++ map (\lab -> (let stat = findActiveStatement ctx2 lab
 										in ([stat], length (getHypotheses stat))))
 								assertionLabels
 							++ zip marked (repeat 0)
@@ -383,7 +409,7 @@ mmpBlock db = do
 		mmpSeparator
 		ctx <- getState
 		db2 <- mmpStatements db
-		setState ctx
+		setState (ctx `ctxWithStatements` filter isAssertion (case db2 of Database d -> map snd d))
 		string "$}"
 		return (deactivateNonAssertions db2)
 	where
@@ -549,10 +575,15 @@ mmVerifiesDatabase :: Database -> Bool
 mmVerifiesDatabase db = all (\(_, res) -> case res of Left _ -> False; Right _ -> True) (mmVerifiesAll db)
 
 findStatement :: Database -> Label -> Statement
-findStatement (Database []) lab = error $ "statement labeled " ++ lab ++ " not found"
+findStatement (Database []) lab = error $ "statement labeled " ++ lab ++ " not found in database"
 findStatement (Database ((_, stat@(lab2, _, _)):rest)) lab
 	| lab == lab2	= stat
 	| True		= findStatement (Database rest) lab
+
+findActiveStatement :: Context -> Label -> Statement
+findActiveStatement ctx lab = case Map.lookup lab (ctxActiveStatements ctx) of
+					Just stat -> stat
+					Nothing -> error $ "statement labeled " ++ lab ++ " not found in context"
 
 getHypotheses :: Statement -> [Statement]
 getHypotheses (_, _, Axiom hyp _) = hyp
