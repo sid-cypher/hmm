@@ -436,7 +436,7 @@ mmComputeTheorem proof = case foldProof proof combine of
 				Right stack -> Left ("proof produced not one theorem but stack " ++ show stack)
 				Left err -> Left ("error: " ++ err)
 	where
-		combine :: Statement -> [(Statement, (Expression, DVRSet))] -> Either String (Expression, DVRSet)
+		combine :: Statement -> [(Expression, DVRSet)] -> Either String (Expression, DVRSet)
 		combine stat labSymsList = case subst' of
 						Right _ -> if dup == []
 								then Right (newExpr, newDVRSet)
@@ -445,7 +445,7 @@ mmComputeTheorem proof = case foldProof proof combine of
 			where
 				(_, expr, _) = stat
 				
-				subst' = unify (map (\((_, ex, _), (ss, _)) -> (ex, ss)) labSymsList)
+				subst' = unify (zip (map (\(_, ex, _) -> ex) (getHypotheses stat)) (map fst labSymsList))
 				subst = fromRight subst'
 
 				newExpr = case labSymsList of [] -> expr; _ -> applySubstitution subst expr
@@ -473,27 +473,26 @@ mmComputeTheorem proof = case foldProof proof combine of
 
 				newDVRSet = dvrSelectOnlyVars (varsOf newExpr)
 						(hypDVRSet `Set.union` dvrApplySubstitution subst (getDVRs stat))
-				hypDVRSet = Set.unions (map (\(_, (_, d)) -> d) labSymsList)
+				hypDVRSet = Set.unions (map snd labSymsList)
 
 
 				dup = duplicateDVRs newDVRSet
 
-foldProof :: Show a => Proof -> (Statement -> [(Statement, a)] -> Either String a) -> Either String [a]
+foldProof :: Show a => Proof -> (Statement -> [a] -> Either String a) -> Either String [a]
 foldProof labs f = foldProof' labs f []
 
-foldProof' :: Show a => Proof -> (Statement -> [(Statement, a)] -> Either String a) -> [a] -> Either String [a]
+foldProof' :: Show a => Proof -> (Statement -> [a] -> Either String a) -> [a] -> Either String [a]
 foldProof' [] _ stack = Right stack
 foldProof' (stat:stats) f stack = case newTop' of
-					Left err -> Left ("could not apply assertion " ++ show lab ++ " (" ++ show (length stats + 1) ++ "th from the right in the proof) to the top " ++ show nHyps ++ " stack entries " ++ show pairs ++ ": " ++ err)
+					Left err -> Left ("could not apply assertion " ++ show lab ++ " (" ++ show (length stats + 1) ++ "th from the right in the proof) to the top " ++ show nrHyps ++ " stack entries " ++ show poppedPart ++ ": " ++ err)
 					Right newTop -> foldProof' stats f (newTop:poppedStack)
 	where
 		(lab, _, _) = stat
-		hyps = getHypotheses stat
-		nHyps = length hyps
-		poppedStack = drop nHyps stack
-		newTop' = f stat pairs
-		pairs = zip hyps (reverse (take nHyps stack))
-		--TODO: check that the stack has enough entries!
+		nrHyps = length (getHypotheses stat)
+		poppedStack = drop nrHyps stack
+		poppedPart = reverse (take nrHyps stack)
+		newTop' = f stat poppedPart
+		--TODO: check that the stack has enough entries: length stack >= nrHyps !
 
 
 type Substitution = [(String, Expression)]
