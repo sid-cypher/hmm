@@ -36,10 +36,10 @@ configuration management system (www.darcs.net).  Just install darcs and
 This will create a directory 'hmm' with the latest version and the change
 history.
 
-The latest stable version is version 0.1, which can be retrieved using the
+The latest stable version is version 0.2, which can be retrieved using the
 following darcs command:
 
-	darcs get --tag=0.1 http://www.solcon.nl/mklooster/repos/hmm/
+	darcs get --tag=0.2 http://www.solcon.nl/mklooster/repos/hmm/
 
 To run Hmm you will need a Haskell implementation.  Hmm was developed using GHC
 6.4 (see http://haskell.org/ghc/), but other Haskell implementations might work
@@ -48,7 +48,16 @@ as well.
 
 Release notes
 -------------
-This version is a post-0.1 development version.
+This is Hmm version 0.2.  This is only a performance release; ql.mm now is
+verified 4 to 5 times faster than before on my development machine.  And set.mm
+is now processed quickly enough (half a minute for me) that I'm prepared to
+wait for the result :-)  The performance gain is larger for files that contain
+compressed proofs; uncompressed proofs probably haven't benefitted that much
+(but I haven't measured).
+
+By the way, the version 0.2 code should be more readable in several places as
+well-- for Haskell code, readability and performance often seem to go hand in
+hand.
 
 Version 0.1 was the first public release.  I have no idea whether I will
 have time to hack further on Hmm in the future, but in any case bug reports,
