@@ -48,12 +48,14 @@ as well.
 
 Release notes
 -------------
-This is Hmm version 0.2.  This is only a performance release; ql.mm now is
-verified 4 to 5 times faster than before on my development machine.  And set.mm
-is now processed quickly enough (half a minute for me) that I'm prepared to
-wait for the result :-)  The performance gain is larger for files that contain
-compressed proofs; uncompressed proofs probably haven't benefitted that much
-(but I haven't measured).
+This is the post-0.2 *development* version.
+
+Version 0.2 was a performance release; ql.mm now is verified 4 to 5 times
+faster than before on my development machine.  And set.mm is now processed
+quickly enough (half a minute for me) that I'm prepared to wait for the result
+:-)  The performance gain is larger for files that contain compressed proofs;
+uncompressed proofs probably haven't benefitted that much (but I haven't
+measured).
 
 By the way, the version 0.2 code should be more readable in several places as
 well-- for Haskell code, readability and performance often seem to go hand in
