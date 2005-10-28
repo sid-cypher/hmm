@@ -1,10 +1,6 @@
 {-
 TODO list, roughly in order of preference:
 
- - functionality: add mmComputeProofTree, together with a ProofTree data
-   type, for use by a future HmmCalc module for computing calculational
-   proofs
-
  - functionality: verifier should give more detail on what went wrong: no call
    to "error" anymore on any input file (and add tests to check wrong input).
    Idea: use an 'error stack': error X because Y because Z
@@ -430,53 +426,69 @@ mapSymbols ctx = map $ \s ->
 			else error ("Unknown math symbol " ++ s)
 
 
-mmComputeTheorem :: Proof -> Either String (Expression, DVRSet)
-mmComputeTheorem proof = case foldProof proof combine of
-				Right [th] -> Right th
+
+
+
+data ProofTree = Apply Statement [ProofTree]
+	deriving (Eq, Show)
+
+mmComputeProofTree :: Proof -> Either String ProofTree
+mmComputeProofTree proof = case foldProof proof combine of
+				Right [tree] -> Right tree
 				Right stack -> Left ("proof produced not one theorem but stack " ++ show stack)
 				Left err -> Left ("error: " ++ err)
 	where
-		combine :: Statement -> [(Expression, DVRSet)] -> Either String (Expression, DVRSet)
-		combine stat labSymsList = case subst' of
+		combine :: Statement -> [ProofTree] -> Either String ProofTree
+		combine stat treeList = Right (Apply stat treeList)
+
+mmComputeTheorem :: Proof -> Either String (Expression, DVRSet)
+mmComputeTheorem proof = case mmComputeProofTree proof of
+				Left err -> Left err
+				Right tree -> mmComputeTheorem' tree
+
+mmComputeTheorem' :: ProofTree -> Either String (Expression, DVRSet)
+mmComputeTheorem' (Apply stat trees) = case subst' of
 						Right _ -> if dup == []
-								then Right (newExpr, newDVRSet)
+								then Right (targetExpr, targetDVRSet)
 								else Left ("found duplicate disjoint variable(s) " ++ show dup)
 						Left err -> Left ("no substitution found: " ++ err)
-			where
-				(_, expr, _) = stat
-				
-				subst' = unify (zip (map (\(_, ex, _) -> ex) (getHypotheses stat)) (map fst labSymsList))
-				subst = fromRight subst'
+	where
+		targetExpr = case trees of [] -> sourceExpr; _ -> applySubstitution subst sourceExpr
 
-				newExpr = case labSymsList of [] -> expr; _ -> applySubstitution subst expr
+		sourceExpr = getExpression stat
+		subtreeResults = map (fromRight . mmComputeTheorem') trees
+		
+		fromExprs = map getExpression (getHypotheses stat)
+		toExprs = map fst subtreeResults
+		subst' = unify (zip fromExprs toExprs)
+		subst = fromRight subst'
 
-				{-
-				   In the following definition we compute the DVRSet on top of the stack as
-				   follows:
+		{-
+		   In the following definition we compute the DVRSet on top of the stack as
+		   follows:
 
-				    (1) First we collect all DVRs of the hypotheses that are popped off the
-				    stack.
+		    (1) First we collect all DVRs of the hypotheses that are popped off the
+		    stack.
 
-				    (2) We add the DVRs of the assertion that we are processing, after
-				    applying the substitution to it.
+		    (2) We add the DVRs of the assertion that we are processing, after
+		    applying the substitution to it.
 
-				    (3) We select only those DVRs that occur in the new expression on top
-				    of the stack.
+		    (3) We select only those DVRs that occur in the new expression on top
+		    of the stack.
 
-				   The last step makes sure that no optional disjoint variable restrictions
-				   are needed for a proof.  This gives the verifier better performance,
-				   because we don't have to store the optional restrictions for any
-				   assertion.  It also makes this verifier less strict than the official
-				   Metamath program, which requires all optional restrictions that are used
-				   thoughout a proof.
-				-}
+		   The last step makes sure that no optional disjoint variable restrictions
+		   are needed for a proof.  This gives the verifier better performance,
+		   because we don't have to store the optional restrictions for any
+		   assertion.  It also makes this verifier less strict than the official
+		   Metamath program, which requires all optional restrictions that are used
+		   thoughout a proof.
+		-}
 
-				newDVRSet = dvrSelectOnlyVars (varsOf newExpr)
-						(hypDVRSet `Set.union` dvrApplySubstitution subst (getDVRs stat))
-				hypDVRSet = Set.unions (map snd labSymsList)
+		targetDVRSet = dvrSelectOnlyVars (varsOf targetExpr)
+				(subtreeDVRSet `Set.union` dvrApplySubstitution subst (getDVRs stat))
+		subtreeDVRSet = Set.unions (map snd subtreeResults)
 
-
-				dup = duplicateDVRs newDVRSet
+		dup = duplicateDVRs targetDVRSet
 
 foldProof :: Show a => Proof -> (Statement -> [a] -> Either String a) -> Either String [a]
 foldProof labs f = foldProof' labs f []
@@ -572,6 +584,9 @@ getDVRs :: Statement -> DVRSet
 getDVRs (_, _, Axiom _ d) = d
 getDVRs (_, _, Theorem _ d _) = d
 getDVRs _ = Set.empty
+
+getExpression :: Statement -> Expression
+getExpression (_, ex, _) = ex
 
 allPairs :: [a] -> [(a, a)]
 allPairs [] = []

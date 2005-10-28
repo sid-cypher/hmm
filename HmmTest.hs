@@ -185,7 +185,9 @@ testCases =
 				`ctxWithActiveHyps` [tt,tr,ts,wp,wq]
 			,Database [tt,tr,ts,wp,wq,tze,tpl,weq,wim,a1,a2,mp,th1]
 			)
+		mmComputeProofTree [tt] @?= Right (Apply tt [])
 		mmComputeTheorem [tt] @?= Right ([Con "term", Var "t"], noDisjoints)
+		mmComputeProofTree [tt, tze, tpl] @?= Right (Apply tpl [Apply tt [], Apply tze []])
 		mmComputeTheorem [tt, tze, tpl] @?=
 			Right ([Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"], noDisjoints)
 		mmVerifiesLabel db "th1" @?= Right ()
