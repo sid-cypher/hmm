@@ -322,49 +322,41 @@ mmpCompressedProof mandatoryStatements = do
 		mmpSeparator
 		markedNumbers <- mmpCompressedNumbers
 		ctx <- getState
-		return (createProof assertionLabels markedNumbers ctx)
+		return (computeProof ctx assertionLabels markedNumbers)
 	where
-		createProof :: [Label] -> [(Int,Bool)] -> Context -> Proof
-		createProof assertionLabels markedNumbers ctx2 = proof
+		-- NOTE: for a correct proof, the call to proofStack results in a one-element list
+		-- but here we are just parsing, so we want to allow syntactically correct and
+		-- semantically incorrect proofs.  (But the distinction between syntax and semantics
+		-- is blurry here.)
+		computeProof :: Context -> [Label] -> [(Int,Bool)] -> Proof
+		computeProof context assertionLabels markedNumbers =
+			concat (reverse (computeProofStack context assertionLabels markedNumbers ([], [])))
+
+		-- The meaning of the accumulated arguments:
+		-- marked:        the 1st, 2nd, ... marked subproofs
+		-- subproofStack: the stack of subproofs, starting with the top of the stack
+		computeProofStack :: Context -> [Label] -> [(Int, Bool)] -> ([Proof], [Proof]) -> [Proof]
+		computeProofStack _ _ [] (_, subproofStack) = subproofStack
+		computeProofStack context assertionLabels ((n, mark):restMarkedNumbers) (marked, subproofStack) =
+			computeProofStack context assertionLabels restMarkedNumbers (newMarked, newSubproofStack)
 			where
-				proof :: Proof
-				proof = proof' markedNumbers ([], [], [])
+				newSubproofStack :: [Proof]
+				newSubproofStack@(newSubproof:_) = (meaning !! n) subproofStack
+				
+				newMarked :: [Proof]
+				newMarked = if mark then marked ++ [newSubproof] else marked
 
-				-- The meaning of the accumulated arguments:
-				-- marked:        the 1st, 2nd, ... marked subproofs
-				-- subproofStack: the stack of subproofs, starting with the top of the stack
-				-- prf:           the proof resulting from all markedNumbers processed so far
-				proof' :: [(Int, Bool)] -> ([Proof], [Proof], Proof) -> Proof
-				proof' [] (_, _, p) = p
-				proof' ((n, mark):rest) (marked, subproofStack, p) = proof' rest (newMarked, newSubproofStack, newPrf)
-					where
-						-- meaning !! n =
-						--	(the subproof associated with number n
-						--	,the number of proof steps that it pops from the proof stack
-						--	)
-						meaning :: [(Proof, Int)]
-						meaning =
-							map (\stat -> ([stat], 0)) mandatoryStatements
-							++ map (\lab -> (let stat = findActiveStatement ctx2 lab
-										in ([stat], length (getHypotheses stat))))
-								assertionLabels
-							++ zip marked (repeat 0)
-
-						nrPopped :: Int
-						newSteps :: Proof
-						(newSteps, nrPopped) = meaning !! n
-
-						newSubproof :: Proof
-						newSubproof = concat (reverse (take nrPopped subproofStack)) ++ newSteps
-
-						newMarked :: [Proof]
-						newMarked = if mark then marked ++ [newSubproof] else marked
-
-						newSubproofStack :: [Proof]
-						newSubproofStack = newSubproof : drop nrPopped subproofStack
-
-						newPrf :: Proof
-						newPrf = p ++ newSteps
+				-- meaning !! n gives, for each number 'n' occurring in a compressed proof,
+				-- the mapping of the existing stack of subproofs to the new stack of subproofs
+				meaning :: [[Proof] -> [Proof]]
+				meaning =
+					map (\stat -> (\stack -> [stat] : stack)) mandatoryStatements
+					++ map (\lab -> let
+								stat = findActiveStatement context lab
+								nrHyps = length (getHypotheses stat)
+							in (\stack -> (concat (reverse (take nrHyps stack)) ++ [stat]) : drop nrHyps stack)
+						) assertionLabels
+					++ map (\p -> (\stack -> p : stack)) marked
 
 mmpCompressedNumbers :: MMParser [(Int, Bool)]
 mmpCompressedNumbers = do
