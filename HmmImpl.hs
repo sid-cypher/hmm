@@ -430,8 +430,8 @@ mapSymbols ctx = map $ \s ->
 			else error ("Unknown math symbol " ++ s)
 
 
-mmComputeTheorem :: Database -> Proof -> Either String (Expression, DVRSet)
-mmComputeTheorem db proof = case foldProof db proof combine of
+mmComputeTheorem :: Proof -> Either String (Expression, DVRSet)
+mmComputeTheorem proof = case foldProof proof combine of
 				Right [th] -> Right th
 				Right stack -> Left ("proof produced not one theorem but stack " ++ show stack)
 				Left err -> Left ("error: " ++ err)
@@ -478,14 +478,14 @@ mmComputeTheorem db proof = case foldProof db proof combine of
 
 				dup = duplicateDVRs newDVRSet
 
-foldProof :: Show a => Database -> Proof -> (Statement -> [(Statement, a)] -> Either String a) -> Either String [a]
-foldProof db labs f = foldProof' db labs f []
+foldProof :: Show a => Proof -> (Statement -> [(Statement, a)] -> Either String a) -> Either String [a]
+foldProof labs f = foldProof' labs f []
 
-foldProof' :: Show a => Database -> Proof -> (Statement -> [(Statement, a)] -> Either String a) -> [a] -> Either String [a]
-foldProof' _ [] _ stack = Right stack
-foldProof' db (stat:stats) f stack = case newTop' of
+foldProof' :: Show a => Proof -> (Statement -> [(Statement, a)] -> Either String a) -> [a] -> Either String [a]
+foldProof' [] _ stack = Right stack
+foldProof' (stat:stats) f stack = case newTop' of
 					Left err -> Left ("could not apply assertion " ++ show lab ++ " (" ++ show (length stats + 1) ++ "th from the right in the proof) to the top " ++ show nHyps ++ " stack entries " ++ show pairs ++ ": " ++ err)
-					Right newTop -> foldProof' db stats f (newTop:poppedStack)
+					Right newTop -> foldProof' stats f (newTop:poppedStack)
 	where
 		(lab, _, _) = stat
 		hyps = getHypotheses stat
@@ -522,15 +522,15 @@ applySubstitution' subst (Var v : rest) =
 
 
 mmVerifiesLabel :: Database -> Label -> Either String ()
-mmVerifiesLabel db lab = case mmVerifiesProof db proof expr dvrSet of
+mmVerifiesLabel db lab = case mmVerifiesProof proof expr dvrSet of
 				Left err -> Left ("proof of " ++ show lab ++ ": " ++ err)
 				Right () -> Right ()
 	where
 		stat = findStatement db lab
 		(_, expr, Theorem _ dvrSet proof) = stat
 
-mmVerifiesProof :: Database -> Proof -> Expression -> DVRSet -> Either String ()
-mmVerifiesProof db proof expr dvrSet = case mmComputeTheorem db proof of
+mmVerifiesProof :: Proof -> Expression -> DVRSet -> Either String ()
+mmVerifiesProof proof expr dvrSet = case mmComputeTheorem proof of
 	Right (computedExpr, computedDVRSet) -> if computedExpr == expr
 					then let
 						violated = computedDVRSet `Set.difference` dvrSet
@@ -541,8 +541,8 @@ mmVerifiesProof db proof expr dvrSet = case mmComputeTheorem db proof of
 	Left err -> Left ("failed to verify proof " ++ show proof ++ ":" ++ err)
 
 mmVerifiesAll :: Database -> [(Label, Either String ())]
-mmVerifiesAll db@(Database stats) =
-	map (\(lab, proof, expr, dvrSet) -> (lab, mmVerifiesProof db proof expr dvrSet)) (selectProofs stats)
+mmVerifiesAll (Database stats) =
+	map (\(lab, proof, expr, dvrSet) -> (lab, mmVerifiesProof proof expr dvrSet)) (selectProofs stats)
 	where
 		selectProofs :: [Statement] -> [(Label, Proof, Expression, DVRSet)]
 		selectProofs [] = []

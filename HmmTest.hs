@@ -185,8 +185,8 @@ testCases =
 				`ctxWithActiveHyps` [tt,tr,ts,wp,wq]
 			,Database [tt,tr,ts,wp,wq,tze,tpl,weq,wim,a1,a2,mp,th1]
 			)
-		mmComputeTheorem db [tt] @?= Right ([Con "term", Var "t"], noDisjoints)
-		mmComputeTheorem db [tt, tze, tpl] @?=
+		mmComputeTheorem [tt] @?= Right ([Con "term", Var "t"], noDisjoints)
+		mmComputeTheorem [tt, tze, tpl] @?=
 			Right ([Con "term", Con "(", Var "t", Con "+", Con "0", Con ")"], noDisjoints)
 		mmVerifiesLabel db "th1" @?= Right ()
 		mmVerifiesDatabase db @?= True
@@ -219,7 +219,7 @@ testCases =
 		let (_, _, Theorem _ disjoints _) = findStatement db "ax17eq"
 		disjoints @?= dvrs [("x", "z"), ("y", "z")]
 		mmVerifiesLabel db "ax17eq" @?= Right ()
-		mmComputeTheorem db
+		mmComputeTheorem
 			(map (findStatement db)
 			["vz","vx","weq","vz","wal","vz","vy","weq","vz","wal"
 			,"vx","vy","weq","vx","vy","weq","vz","wal","wi","vx"
@@ -232,7 +232,7 @@ testCases =
 		Right (_, db) <- mmParseFromFile "set-part3.mm"
 		let (_, _, Theorem _ disjoints _) = findStatement db "a16g"
 		disjoints @?= dvrs [("x", "y")]
-		mmComputeTheorem db
+		mmComputeTheorem
 			(map (findStatement db)
 			["vz","vx","weq","vz","wal","vx","vy","weq","vx","wal"
 			,"wph","wph","vz","wal","wi","vx","vy","weq","vx","wal"
@@ -253,7 +253,7 @@ testCases =
 		Right (_, db) <- mmParseFromFile "set-part4.mm"
 		let (_, _, Theorem _ disjoints _) = findStatement db "ddeeq1"
 		disjoints @?= dvrs [("x","z")]
-		mmComputeTheorem db
+		mmComputeTheorem
 			(map (findStatement db)
 			["vw","vz","weq","vy","vz","weq","vx","vy","vw","vw"
 			,"vz","weq","vx","ax-17","vw","vy","vz","a8b","ddelim"
@@ -268,7 +268,7 @@ testCases =
 		mmVerifiesLabel db "ddeeq1" @?= Right ()
 		let (_, _, Theorem _ disjoints2 _) = findStatement db "sbal2"
 		disjoints2 @?= dvrs [("x","z"),("y","z")]
-		mmComputeTheorem db
+		mmComputeTheorem
 			(map (findStatement db)
 			["vx","vy","weq","vx","wal","wn","vy","vz","weq","wph","vx","wal","wi","vy","wal","vy","vz","weq","wph","wi","vy"
 			,"wal","vx","wal","wph","vx","wal","vy","vz","wsb","wph","vy","vz","wsb","vx","wal","vx","vy","weq","vx","wal","wn"
