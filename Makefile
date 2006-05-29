@@ -1,13 +1,14 @@
 EXE=
 
-default: check
+default: hmmverify$(EXE) hmmprint$(EXE) check
 
-hmmTest$(EXE) hmmverify$(EXE): *.hs
+hmmTest$(EXE) hmmverify$(EXE) hmmprint$(EXE): *.hs
 	ghc -Wall -Werror -O -o hmmTest --make HmmTest
 	ghc -Wall -Werror -O -o hmmverify --make HmmVerify
+	ghc -Wall -Werror -O -o hmmprint --make HmmPrint
 
 clean:
-	rm -f *.o *.hi hmmTest$(EXE) hmmverify$(EXE)
+	rm -f *.o *.hi hmmTest$(EXE) hmmverify$(EXE) hmmprint$(EXE)
 
 check: hmmTest$(EXE)
 	./hmmTest$(EXE)
