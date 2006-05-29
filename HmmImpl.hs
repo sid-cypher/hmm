@@ -114,6 +114,10 @@ isAssertion (_, _, Theorem _ _ _) = True
 isAssertion (_, _, Axiom _ _) = True
 isAssertion _ = False
 
+isDollarE :: Statement -> Bool
+isDollarE (_, _, DollarE) = True
+isDollarE _ = False
+
 
 
 data Context = Context
