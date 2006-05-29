@@ -20,7 +20,7 @@
 -}
 
 module HmmPrinter
-	(mmPrintProof
+	(mmPrintTheoremProof
 	)
 
 where
@@ -28,11 +28,15 @@ where
 import HmmImpl
 
 
-mmPrintProof :: Database -> Label -> String
-mmPrintProof db lab = show tree
+mmPrintTheoremProof :: Database -> Label -> String
+mmPrintTheoremProof db lab = mmPrintProof proof
 	where
 		stat = findStatement db lab
 		(_, _, Theorem _ _ proof) = stat
+
+mmPrintProof :: Proof -> String
+mmPrintProof proof = show tree
+	where
 		tree = onlyExpressions $ onlyEssential $ fromRight $ mmComputeSubtheorems (fromRight $ mmComputeProofTree proof)
 
 onlyEssential :: ProofTree (Statement, Expression, DVRSet) -> ProofTree (Statement, Expression, DVRSet)
