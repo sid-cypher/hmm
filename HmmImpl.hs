@@ -429,34 +429,37 @@ mapSymbols ctx = map $ \s ->
 
 
 
-data ProofTree = Apply Statement [ProofTree]
+data ProofTree a = Apply a [ProofTree a]
 	deriving (Eq, Show)
 
-mmComputeProofTree :: Proof -> Either String ProofTree
+mmComputeProofTree :: Proof -> Either String (ProofTree Statement)
 mmComputeProofTree proof = case foldProof proof combine of
 				Right [tree] -> Right tree
 				Right stack -> Left ("proof produced not one theorem but stack " ++ show stack)
 				Left err -> Left ("error: " ++ err)
 	where
-		combine :: Statement -> [ProofTree] -> Either String ProofTree
+		combine :: Statement -> [ProofTree Statement] -> Either String (ProofTree Statement)
 		combine stat treeList = Right (Apply stat treeList)
 
 mmComputeTheorem :: Proof -> Either String (Expression, DVRSet)
 mmComputeTheorem proof = case mmComputeProofTree proof of
 				Left err -> Left err
-				Right tree -> mmComputeTheorem' tree
+				Right tree -> case mmComputeSubtheorems tree of
+					Left err -> Left err
+					Right (Apply (_, expr, dvrSet) _) -> Right (expr, dvrSet)
 
-mmComputeTheorem' :: ProofTree -> Either String (Expression, DVRSet)
-mmComputeTheorem' (Apply stat trees) = case subst' of
+mmComputeSubtheorems :: ProofTree Statement -> Either String (ProofTree (Statement, Expression, DVRSet))
+mmComputeSubtheorems (Apply stat trees) = case subst' of
 						Right _ -> if dup == []
-								then Right (targetExpr, targetDVRSet)
+								then Right (Apply (stat, targetExpr, targetDVRSet) subtrees)
 								else Left ("found duplicate disjoint variable(s) " ++ show dup)
 						Left err -> Left ("no substitution found: " ++ err)
 	where
 		targetExpr = case trees of [] -> sourceExpr; _ -> applySubstitution subst sourceExpr
 
 		sourceExpr = getExpression stat
-		subtreeResults = map (fromRight . mmComputeTheorem') trees
+		subtrees = map (fromRight . mmComputeSubtheorems) trees
+		subtreeResults = map (\(Apply (_, expr, dvrSet) _) -> (expr, dvrSet)) subtrees
 		
 		fromExprs = map getExpression (getHypotheses stat)
 		toExprs = map fst subtreeResults
