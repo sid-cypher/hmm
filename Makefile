@@ -7,17 +7,23 @@ hmmTest$(EXE) hmmverify$(EXE) hmmprint$(EXE): *.hs
 	ghc -Wall -Werror -O -o hmmverify --make HmmVerify
 	ghc -Wall -Werror -O -o hmmprint --make HmmPrint
 
+hghtest$(EXE): *.lhs
+	ghc -Wall -Werror -O -o hghtest --make HghTest
+
 doc: HghCore.xhtml
 
 distclean::
-	rm -f *.o *.hi hmmTest$(EXE) hmmverify$(EXE) hmmprint$(EXE)
+	rm -f *.o *.hi
+	rm -f hmmTest$(EXE) hmmverify$(EXE) hmmprint$(EXE)
+	rm -f hghtest$(EXE)
 
 clean:: distclean
 	rm -f .htaccess
 	rm -f *.xhtml
 
-check: hmmTest$(EXE) doc
+check: hmmTest$(EXE) hghtest$(EXE) doc
 	./hmmTest$(EXE)
+	./hghtest$(EXE)
 
 sitecopy: clean sitecopy-is-safe doc
 	echo "Options +Indexes" > .htaccess
