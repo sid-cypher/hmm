@@ -2,6 +2,8 @@ module Main where
 
 import HmmImpl
 
+import System.Exit
+
 import Test.HUnit.Base
 import Test.HUnit.Text
 
@@ -10,8 +12,10 @@ import qualified Data.Set as Set
 
 main :: IO ()
 main = do
-	 _ <- runTestTT testCases
-	 return ()
+	Counts {errors=e, failures=f} <- runTestTT testCases
+	case e+f of
+		0 -> return ()
+		_ -> exitWith (ExitFailure 1)
 
 
 testCases :: Test
