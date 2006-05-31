@@ -77,9 +77,9 @@ Proofs
 
 Now on to proofs::
 
- > data Proof
- >	= Hypothesis Expression
- >	| RuleApp InferenceRule [Expression] [Proof]
+< data Proof
+<	= Hypothesis Expression
+<	| RuleApp InferenceRule [Expression] [Proof]
 
 TODO: Explain what the components of a RuleApp mean, and what it means for a
 RuleApp to be consistent.
@@ -119,9 +119,9 @@ Deriving inference rules: Derivations
 Now we come to the heart of the matter: the Derivation.  It is essential that
 values of this type can only be constructed through ``interpretProof``::
 
- > data Derivation = ToBeDefined2
- > 
- > interpretProof :: Proof -> Either String Derivation
+< data Derivation = ToBeDefined2
+< 
+< interpretProof :: Proof -> Either String Derivation
 
 This function basically implements the Ghilbert proof verification algorithm,
 with the DVRs computed just like Hmm does this for Metamath proofs.
@@ -133,12 +133,12 @@ result will be a Right value with the resulting Derivation.
 For a correct Proof the result of this algorithm is a 'theorem', or in our
 terminology, an InferenceRule::
 
- > targetRule :: Derivation -> InferenceRule
+< targetRule :: Derivation -> InferenceRule
 
 The resulting Derivation also knows what the assumptions of the Proof were,
 i.e., what inference rules were used in the Proof::
 
- > sourceRules :: Derivation -> [InferenceRule]
+< sourceRules :: Derivation -> [InferenceRule]
 
 Two Derivations are equal (under Eq) iff they map the same set of
 InferenceRules to the same InferenceRule.  This implies that a Derivation is
@@ -147,7 +147,7 @@ independent of the Proof that was used to create it.
 
 Open Issue. We could also make it possible to combine Derivation objects::
 
- > combineDerivation :: Derivation -> Derivation -> Derivation
+< combineDerivation :: Derivation -> Derivation -> Derivation
 
 This takes the second derivation, removes from its sourceRules the targetRule
 of the first derivation, and adds to its sourceRules the sourceRules of the
@@ -180,7 +180,7 @@ to be able to weaken a given derivation.
 
 First, to determine the relationship between InferenceRules, we introduce ::
 
- > (==>) :: InferenceRule -> InferenceRule -> Bool
+< (==>) :: InferenceRule -> InferenceRule -> Bool
 
 Basically ``i ==> j`` ("``i`` is at least as strong as ``j``") iff ``i`` and
 ``j`` have the same conclusion, and if the DVRs and hypotheses of ``i`` are a
@@ -188,8 +188,8 @@ subset (under (<==>)) of those of ``j``.
 
 Now we need the following two additional ways to create Derivations::
 
- > strengthenSourceRules :: InferenceRule -> Derivation -> Derivation
- > weakenTargetRule :: InferenceRule -> Derivation -> Derivation
+< strengthenSourceRules :: InferenceRule -> Derivation -> Derivation
+< weakenTargetRule :: InferenceRule -> Derivation -> Derivation
 
 ``strengthenSourceRule`` adds the given InferenceRule to the sourceRules, and
 removes any that are weaker (i.e., implied by it under (==>)).
