@@ -1,4 +1,4 @@
-A HASKELL MODULE FOR SOUND GHILBERT-STYLE PROOFS
+A Haskell module for sound Ghilbert-style proofs
 ================================================
 
 :Author: Marnix Klooster <marnix.klooster@gmail.com>
