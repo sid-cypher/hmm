@@ -3,6 +3,8 @@ A HASKELL MODULE FOR SOUND GHILBERT-STYLE PROOFS
 
 :Author: Marnix Klooster <marnix.klooster@gmail.com>
 
+(This document is usually available in two formats: `XHTML <HghCore.xhtml>`__
+and `literate Haskell <HghCore.lhs>`__.)
 
 Introduction
 ------------
