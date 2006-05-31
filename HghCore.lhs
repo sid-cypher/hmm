@@ -18,12 +18,12 @@ Expressions and inference rules
 -------------------------------
 
 All mathematical expressions are constructed from variables and operators
-(=constants):
+(=constants)::
 
 > data Expression = Var String | App String [Expression]
 
 An InferenceRule represents how to get from source expressions (hypotheses) to
-a target expression (the conclusion).
+a target expression (the conclusion). ::
 
 > data InferenceRule = ...
 >
@@ -38,7 +38,7 @@ order, ignoring duplicates), the same hypotheses (in any order, ignoring
 duplicates), and the same conclusion.
 
 Note that to enable performance optimizations, we make the internal structure
-of an InferenceRule hidden.  This is not a technical necessity.
+of an InferenceRule hidden.  This is not a technical necessity. ::
 
 > data Proof
 >	= Hypothesis Expression
@@ -80,10 +80,10 @@ Deriving inference rules: Derivations
 -------------------------------------
 
 Now we come to the heart of the matter: the Derivation.  It is essential that
-values of this type can only be constructed through ``interpretProof``:
+values of this type can only be constructed through ``interpretProof``::
 
 > data Derivation = ...
->
+> 
 > interpretProof :: Proof -> Either String Derivation
 
 This function basically implements the Ghilbert proof verification algorithm,
@@ -94,12 +94,12 @@ inconsistent), then the result will be Left "some error message", otherwise the
 result will be a Right value with the resulting Derivation.
 
 For a correct Proof the result of this algorithm is a 'theorem', or in our
-terminology, an InferenceRule:
+terminology, an InferenceRule::
 
 > targetRule :: Derivation -> InferenceRule
 
 The resulting Derivation also knows what the assumptions of the Proof were,
-i.e., what inference rules were used in the Proof:
+i.e., what inference rules were used in the Proof::
 
 > sourceRules :: Derivation -> [InferenceRule]
 
@@ -108,7 +108,7 @@ InferenceRules to the same InferenceRule.  This implies that a Derivation is
 independent of the Proof that was used to create it.
 
 
-Open Issue. We could also make it possible to combine Derivation objects:
+Open Issue. We could also make it possible to combine Derivation objects::
 
 > combineDerivation :: Derivation -> Derivation -> Derivation
 
@@ -141,7 +141,7 @@ that ``interpretProof`` computes the "strongest" inference rule that is proven
 by the given Proof.  To do proper theorem verification à la Ghilbert, we need
 to be able to weaken a given derivation.
 
-First, to determine the relationship between InferenceRules, we introduce
+First, to determine the relationship between InferenceRules, we introduce ::
 
 > (==>) :: InferenceRule -> InferenceRule -> Bool
 
@@ -149,7 +149,7 @@ Basically ``i ==> j`` ("``i`` is at least as strong as ``j``") iff ``i`` and
 ``j`` have the same conclusion, and if the DVRs and hypotheses of ``i`` are a
 subset (under (<==>)) of those of ``j``.
 
-Now we need the following two additional ways to create Derivations:
+Now we need the following two additional ways to create Derivations::
 
 > strengthenSourceRules :: InferenceRule -> Derivation -> Derivation
 > weakenTargetRule :: InferenceRule -> Derivation -> Derivation
