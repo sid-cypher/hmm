@@ -24,5 +24,7 @@
 >	[Var "x" @?= Var "x"
 >	,inferenceRule [] [] (Var "P") @?= inferenceRule [] [] (Var "P")
 >	,inferenceRule [("P","Q")] [] (Var "P") @?= inferenceRule [("Q","P")] [] (Var "P")
+>	,Hypothesis (Var "P") @?= Hypothesis (Var "P")
+>	,RuleApp (inferenceRule [] [] (Var "P")) [Var "Q"] [] @?= RuleApp (inferenceRule [] [] (Var "P")) [Var "Q"] []
 >	]
 >	]

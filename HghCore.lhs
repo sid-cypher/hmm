@@ -18,6 +18,7 @@ This module could be the core of a Ghilbert verifier. ::
 > module HghCore
 >	(Expression(Var, App)
 >	,InferenceRule, inferenceRule, ruleDVRs, ruleHypotheses, ruleConclusion
+>	,Proof(Hypothesis, RuleApp)
 >	)
 > where
 
@@ -78,9 +79,10 @@ Proofs
 
 Now on to proofs::
 
-< data Proof
-<	= Hypothesis Expression
-<	| RuleApp InferenceRule [Expression] [Proof]
+> data Proof
+>	= Hypothesis Expression
+>	| RuleApp InferenceRule [Expression] [Proof]
+>	deriving (Eq, Show)
 
 TODO: Explain what the components of a RuleApp mean, and what it means for a
 RuleApp to be consistent.
