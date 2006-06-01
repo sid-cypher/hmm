@@ -30,6 +30,8 @@ module. ::
 >	(Expression(Var, App)
 >	,InferenceRule, inferenceRule, ruleDVRs, ruleHypotheses, ruleConclusion
 >	,Proof(Hypothesis, RuleApp)
+>	,Derivation, sourceRules, targetRule
+>	,interpretProof
 >	)
 > where
 
@@ -133,34 +135,114 @@ verifier.  That's why I went with that option.  (End of Design Issue.)
 Deriving inference rules: Derivations
 -------------------------------------
 
-Now we come to the heart of the matter: the ``Derivation``.  It is essential
-that values of this type can only be constructed through ``interpretProof``::
+Now we come to the heart of the matter: the ``Derivation``.   A ``Derivation``
+says: if these inference rules (the 'source rules') hold, then this inference
+rule (the 'target rule') holds as well. ::
 
-< data Derivation = ToBeDefined2
-< 
-< interpretProof :: Proof -> Either String Derivation
+> data Derivation = Derivation
+>	{sourceRules :: [InferenceRule]
+>	,targetRule :: InferenceRule
+>	}
+>	deriving (Show, Eq) --TODO: implement a correct Eq
+
+We do not export the constructors for the ``Derivation`` datatype, because we
+require that only 'true' derivations can be constructed by clients of this
+module.  Therefore we will limit the ways in which ``Derivation`` objects can
+be created.
+
+As a simple example, from the following two inference rules:
+
+ * for all ``F``, ``G`` and ``H``, if ``G <-> H`` holds, then ``(F \/ G) <-> (F
+   \/ H)`` holds
+
+ * for all ``P`` and ``Q``, if both ``P`` and ``P <-> Q`` hold, then ``Q``
+   holds
+
+we can derive the following so-called derived inference rule:
+
+ * for all ``F``, ``G``, and ``H``, if both ``F \/ G`` and ``G <-> H`` hold,
+   then ``F \/ H`` holds
+
+For now the only function that results in a Derivation is ``interpretProof``::
+
+> interpretProof :: Proof -> Either String Derivation
 
 This function basically implements the Ghilbert proof verification algorithm,
-with the DVRs computed just like Hmm does this for Metamath proofs.
-
+with the DVRs computed just like Hmm does this for Metamath proofs.  
 If the ``Proof`` is incorrect (i.e., if a ``RuleApp`` in it is inconsistent),
 then the result will be ``Left "some error message"``, otherwise the result
 will be a ``Right`` value with the resulting ``Derivation``.
 
-For a correct ``Proof`` the result of this algorithm is a 'theorem', or in our
-terminology, an ``InferenceRule``::
+The simplest part of the Ghilbert proof algorithm is handling an
+``Hypothesis``::
 
-< targetRule :: Derivation -> InferenceRule
+> interpretProof (Hypothesis expr) =
+>	Right $ Derivation
+>		{sourceRules = []
+>		,targetRule = inferenceRule [] [expr] expr
+>		}
 
-The resulting ``Derivation`` also knows what the assumptions of the ``Proof``
-were, i.e., what inference rules were used in the ``Proof``::
+In words: any hypothesis proves the simplest possible inference rule, namely
+that from any expression we can derive any expression.
 
-< sourceRules :: Derivation -> [InferenceRule]
+``RuleApp`` is the interesting case::
+
+> interpretProof (RuleApp rule _vars subproofs) --TODO: use the variables
+
+First we handle the inconsistent uses of ``RuleApp``.  There needs to be
+exactly one subproof per rule hypothesis::
+
+>	| length (ruleHypotheses rule) /= length subproofs =
+>		Left $ "TODO: nice error message"
+
+TODO: for correctness,
+
+ * check that subderivationsOrErrors has only Right values
+ * check that substitutionsOrErrors has only Right values
+ * check that substitution has no duplicate keys
+
+If all of the above is correct, then the resulting ``Derivation`` ::
+
+>	| True =
+>		Right $ Derivation
+
+has as its source rules, the current inference rule, together with those of
+its subderivations::
+
+>			{sourceRules = rule : concat (map sourceRules subderivations)
+
+From the ``RuleApp`` ``Proof`` we can derive that the conclusion of the rule
+(after substitution) follows from all hypotheses of all subproofs::
+
+>			,targetRule = let
+>				dvrs = [] --TODO: implement
+>				hypotheses = concat $ map (ruleHypotheses . targetRule) subderivations
+>				conclusion = exprSubstitute substitution (ruleConclusion rule)
+>			 in inferenceRule dvrs hypotheses conclusion
+>			}
+
+In the above we used the following definitions::
+
+>	where
+>		subderivationsOrErrors = map interpretProof subproofs
+>		subderivations = map (\(Right x) -> x) subderivationsOrErrors
+>
+>		subconclusions = map (ruleConclusion . targetRule) subderivations
+>
+>		substitutionsOrErrors :: [Either String Substitution]
+>		substitutionsOrErrors = zipWith findSubstitution
+>						(ruleHypotheses rule) subconclusions
+>
+>		substitution :: Substitution
+>		substitution = concat (map (\(Right x) -> x) substitutionsOrErrors)
+
+See the appendix for the substitution functions.
+
+This completes the implementation of the proof algorithm.
 
 Two ``Derivation`` objects are equal (under ``Eq``) iff they map the same *set*
 of ``InferenceRule`` to the same ``InferenceRule``.  This implies that a
 ``Derivation`` is independent of the ``Proof`` that was used to create it.
-
 
 Open Issue. We could also make it possible to combine ``Derivation`` objects::
 
@@ -215,3 +297,56 @@ Now we need the following two additional ways to create ``Derivations``::
 ``InferenceRule``, but only if the original rule implies the new one (otherwise
 an error occurs).
 
+
+Appendix: helper functions
+--------------------------
+
+This appendix implements auxiliary functionality.
+
+Substitutions
+~~~~~~~~~~~~~
+
+A substitution describes how to map variables to expressions::
+
+> type Substitution = [(String, Expression)]
+
+Apply a substitution is simple::
+
+> exprSubstitute :: Substitution -> Expression -> Expression
+> exprSubstitute s (Var v) = case lookup v s of
+>				Just expr -> expr
+>				Nothing -> error $ "could not find " ++ show v ++ " in " ++ show s
+> exprSubstitute s (App c exprs) = App c (map (exprSubstitute s) exprs)
+
+It is equally simple to find a substitution from one expression to another::
+
+> findSubstitution :: Expression -> Expression -> Either String Substitution
+> findSubstitution (Var v) expr = Right $ [(v, expr)]
+> findSubstitution expr1@(App _ _) expr2@(Var _) =
+>	Left $ "cannot match " ++ show expr1 ++ " and " ++ show expr2
+> findSubstitution expr1@(App c1 exprs1) expr2@(App c2 exprs2)
+>	| c1 /= c2 =
+>		Left $ "cannot match operators of " ++ show expr1 ++ " and " ++ show expr2
+>	| length exprs1 /= length exprs2 =
+>		Left $ "different arity in " ++ show expr1 ++ " and " ++ show expr2
+>	| not allOk =
+>		Left $ "no substitution found from " ++ show expr1 ++ " to " ++ show expr2
+>		--TODO: add the Left values from substitutionsOrErrors
+>	--TODO: check for duplicate keys in substitutions!
+>	| True =
+>		Right $ substitution
+>	where
+>		substitutionsOrErrors = zipWith findSubstitution exprs1 exprs2
+>		allOk = allRight substitutionsOrErrors
+>		substitution = concat $ map (\(Right x) -> x) substitutionsOrErrors
+
+
+Error messages
+~~~~~~~~~~~~~~
+
+::
+
+> allRight :: [Either a b] -> Bool
+> allRight [] = True
+> allRight (Left _ : _) = False
+> allRight (Right _ : rest) = allRight rest
