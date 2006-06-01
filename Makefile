@@ -35,5 +35,6 @@ sitecopy-is-safe:
 		|| (echo "You have unrecorded changes!" && false)
 
 %.xhtml: %.lhs
-	rst2html.py --exit-status=info --report=info -s -g $< $@ || (rm -f $@ && false)
+	rst2html.py --stylesheet=voidspace.css --exit-status=info --report=info -s -g $< $@ \
+		|| (rm -f $@ && false)
 
