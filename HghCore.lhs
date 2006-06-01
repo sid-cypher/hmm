@@ -2,6 +2,9 @@ A Haskell module for sound Ghilbert-style proofs
 ================================================
 
 :Author: Marnix Klooster <marnix.klooster@gmail.com>
+:Copyright: GPL version 2 or later
+:Note: This is a work in progress.  Correctness and completeness not guaranteed.
+	You have been warned!
 
 (This document is usually available in two formats: `XHTML <HghCore.xhtml>`__
 and `literate Haskell <HghCore.lhs>`__.)
@@ -13,7 +16,15 @@ Here is the suggested interface for a small Haskell module that implements the
 Ghilbert-based core proof language, which I suggested to Raph Levien (personal
 e-mail, 30 May 2006).
 
-This module could be the core of a Ghilbert verifier. ::
+This module could be the core of a Ghilbert verifier.
+
+Some understanding of Metamath and/or Ghilbert is useful, but this document is
+intended to be reasonably self-contained.
+
+The code in this document has been tested under GHC 6.4.2, but could very well
+work with other Haskell systems as well.  Since this document is a so-called
+literate Haskell module, we must start with the items that are exported by this
+module. ::
 
 > module HghCore
 >	(Expression(Var, App)
@@ -22,7 +33,7 @@ This module could be the core of a Ghilbert verifier. ::
 >	)
 > where
 
-We need some auxiliary modules::
+We will need some auxiliary functionality from standard modules::
 
 > import Data.List(sort, nub)
 
@@ -65,7 +76,7 @@ order::
 
 This helps us in the implementation of equality.
 
-Two ``InferenceRule`` objectss are equal (under ``Eq``) iff they have the same
+Two ``InferenceRule`` objects are equal (under ``Eq``) iff they have the same
 DVRs (in any order, ignoring duplicates), the same hypotheses (in the same
 order, including potential duplicates), and the same conclusion.
 
