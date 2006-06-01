@@ -1,14 +1,15 @@
 EXE=
+WALL=-Wall
 
 default: hmmverify$(EXE) hmmprint$(EXE) check doc
 
 hmmTest$(EXE) hmmverify$(EXE) hmmprint$(EXE): *.hs
-	ghc -Wall -Werror -O -o hmmTest --make HmmTest
-	ghc -Wall -Werror -O -o hmmverify --make HmmVerify
-	ghc -Wall -Werror -O -o hmmprint --make HmmPrint
+	ghc ${WALL} -Werror -O -o hmmTest --make HmmTest
+	ghc ${WALL} -Werror -O -o hmmverify --make HmmVerify
+	ghc ${WALL} -Werror -O -o hmmprint --make HmmPrint
 
 hghtest$(EXE): *.lhs
-	ghc -Wall -Werror -O -o hghtest --make HghTest
+	ghc ${WALL} -Werror -O -o hghtest --make HghTest
 
 doc: HghCore.xhtml
 
