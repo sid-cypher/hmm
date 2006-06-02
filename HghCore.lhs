@@ -103,7 +103,7 @@ order::
 >		| p <= q = (p, q)
 >		| True = (q, p)
 
-This helps us in the implementation of equality.
+This helps us in the implementation of equality, below.
 
 Two ``InferenceRule`` objects are equal (under ``Eq``) iff they have the same
 DVRs (in any order, ignoring duplicates), the same hypotheses (in the same
