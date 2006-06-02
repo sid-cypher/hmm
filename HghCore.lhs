@@ -15,23 +15,50 @@ Introduction
 Here is the suggested interface for a small Haskell module that implements the
 Ghilbert-based core proof language, which I suggested to Raph Levien (personal
 e-mail, 30 May 2006).
+This module could be the core of a Ghilbert verifier::
 
-This module could be the core of a Ghilbert verifier.
+> module HghCore
 
 Some understanding of Metamath and/or Ghilbert is useful, but this document is
 intended to be reasonably self-contained.
 
 The code in this document has been tested under GHC 6.4.2, but could very well
-work with other Haskell systems as well.  Since this document is a so-called
-literate Haskell module, we must start with the items that are exported by this
-module. ::
+work with other Haskell systems as well.  To actually make this document work
+like a 'literate Haskell module', the order of this document is sometimes
+forced a bit.
 
-> module HghCore
->	(Expression(Var, App)
->	,InferenceRule, inferenceRule, ruleDVRs, ruleHypotheses, ruleConclusion
->	,Proof(Hypothesis, RuleApp)
->	,Derivation, sourceRules, targetRule
+
+Overview
+--------
+
+This module provides an encapsulated data type ::
+
+>	(Derivation
+
+with accessors ::
+
+>	,sourceRules, targetRule
+
+together with a very limited way of creating values of this type::
+
 >	,interpretProof
+
+This function takes a ::
+
+>	,Proof(Hypothesis, RuleApp)
+
+which is essentially the same as a Ghilbert proof.  ``interpretProof`` then
+computes the resulting 'thm' (the 'target inference rule' of the ``Derivation``).
+What Ghilbert calls a 'thm' or a 'stmt', we call an ::
+
+>	,InferenceRule, inferenceRule, ruleDVRs, ruleHypotheses, ruleConclusion
+
+``interpretProof`` also keeps track of all inference rules that are used by the proof (the
+'source inference rules' of the ``Derivation``).
+
+All this is based on LISP-like expressions, just like GHilbert::
+
+>	,Expression(Var, App)
 >	)
 > where
 
