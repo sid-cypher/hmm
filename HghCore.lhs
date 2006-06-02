@@ -244,7 +244,7 @@ From the ``RuleApp`` ``Proof`` we can derive that the conclusion of the rule
 >			,targetRule = let
 >				dvrs = [] --TODO: implement
 >				hypotheses = concat $ map (ruleHypotheses . targetRule) subderivations
->				conclusion = exprSubstitute substitution (ruleConclusion rule)
+>				conclusion = substApply substitution (ruleConclusion rule)
 >			 in inferenceRule dvrs hypotheses conclusion
 >			}
 
@@ -339,11 +339,11 @@ A substitution describes how to map variables to expressions::
 
 Apply a substitution is simple::
 
-> exprSubstitute :: Substitution -> Expression -> Expression
-> exprSubstitute s (Var v) = case lookup v s of
+> substApply :: Substitution -> Expression -> Expression
+> substApply s (Var v) = case lookup v s of
 >				Just expr -> expr
 >				Nothing -> error $ "could not find " ++ show v ++ " in " ++ show s
-> exprSubstitute s (App c exprs) = App c (map (exprSubstitute s) exprs)
+> substApply s (App c exprs) = App c (map (substApply s) exprs)
 
 It is equally simple to find a substitution from one expression to another::
 
@@ -359,13 +359,20 @@ It is equally simple to find a substitution from one expression to another::
 >	| not allOk =
 >		Left $ "no substitution found from " ++ show expr1 ++ " to " ++ show expr2
 >		--TODO: add the Left values from substitutionsOrErrors
->	--TODO: check for duplicate keys in substitutions!
 >	| True =
->		Right $ substitution
+>		substitutionOrError
+>		--TODO: if Left, add a Left error message saying which substitution is impossible
 >	where
 >		substitutionsOrErrors = zipWith findSubstitution exprs1 exprs2
 >		allOk = allRight substitutionsOrErrors
->		substitution = concat $ map (\(Right x) -> x) substitutionsOrErrors
+>		substitutionOrError = substMerge $ map (\(Right x) -> x) substitutionsOrErrors
+
+For now we implement ``substMerge`` in a very simple way::
+
+> substMerge :: [Substitution] -> Either String Substitution
+> substMerge = Right . concat
+
+TODO: check for key duplication!
 
 
 Error messages
