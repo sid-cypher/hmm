@@ -40,11 +40,11 @@
 >			)
 >		@?= Right ([trivial $ Var "P"], trivial $ Var "Q")
 
-<	,interpretProof2
-<			(RuleApp leibniz_equiv_rightOr [Var "F"]
-<				[Hypothesis (App "<->" [Var "G", Var "H"])]
-<			)
-<		@?= Right ([leibniz_equiv_rightOr], leibniz_equiv_rightOr)
+>	,interpretProof2
+>			(RuleApp leibniz_equiv_rightOr [Var "F"]
+>				[Hypothesis (App "<->" [Var "G", Var "H"])]
+>			)
+>		@?= Right ([leibniz_equiv_rightOr], leibniz_equiv_rightOr)
 
 TODO: Check the stuff from the Appendix.
 

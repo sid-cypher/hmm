@@ -64,7 +64,7 @@ All this is based on LISP-like expressions, just like GHilbert::
 
 We will need some auxiliary functionality from standard modules::
 
-> import Data.List(sort, nub)
+> import Data.List(sort, nub, (\\))
 
 
 Expressions and inference rules
@@ -214,7 +214,7 @@ that from any expression we can derive any expression.
 
 ``RuleApp`` is the interesting case::
 
-> interpretProof (RuleApp rule _vars subproofs) --TODO: use the variables
+> interpretProof (RuleApp rule varExprs subproofs)
 
 First we handle the inconsistent uses of ``RuleApp``.  There needs to be
 exactly one subproof per rule hypothesis::
@@ -261,7 +261,19 @@ In the above we used the following definitions::
 >						(ruleHypotheses rule) subconclusions
 >
 >		substitution :: Substitution
->		substitution = concat (map (\(Right x) -> x) substitutionsOrErrors)
+>		substitution =
+>			concat (map (\(Right x) -> x) substitutionsOrErrors)
+>			++ zip (ruleLocalVars rule) varExprs
+>			--Note that no substitution key duplication is possible
+>			--here
+
+Here the 'rule local variables' are those that only occur in its conclusion,
+and not in its hypotheses::
+
+> ruleLocalVars :: InferenceRule -> [String]
+> ruleLocalVars rule =
+>	nub (varsOf (ruleConclusion rule))
+>	\\ concat (map varsOf (ruleHypotheses rule))
 
 See the appendix for the substitution functions.
 
@@ -329,6 +341,16 @@ Appendix: helper functions
 --------------------------
 
 This appendix implements auxiliary functionality.
+
+Expressions
+~~~~~~~~~~~
+
+The variables occurring in an expression are easily computed::
+
+> varsOf :: Expression -> [String]
+> varsOf (Var v) = [v]
+> varsOf (App _c exprs) = concat $ map varsOf exprs
+
 
 Substitutions
 ~~~~~~~~~~~~~
