@@ -32,30 +32,36 @@
 >		@?= mkInferenceRule (mkDVRSet [("Q","P")]) [] (Var "P")
 
 >	,Hypothesis (Var "P") @?= Hypothesis (Var "P")
->	,RuleApp (mkInferenceRule (mkDVRSet []) [] (Var "P")) [Var "Q"] []
->		@?= RuleApp (mkInferenceRule (mkDVRSet []) [] (Var "P")) [Var "Q"] []
+>	,RuleApp [] [Var "Q"] (mkInferenceRule (mkDVRSet []) [] (Var "P"))
+>		@?= RuleApp [] [Var "Q"] (mkInferenceRule (mkDVRSet []) [] (Var "P"))
 
 >	,interpretProof2 (Hypothesis (Var "P"))
 >		@?= Right ([], mkInferenceRule (mkDVRSet []) [(Var "P")] (Var "P"))
 
 >	,interpretProof2
->			(RuleApp (trivial $ Var "P") []
->				[Hypothesis $ Var "Q"]
+>			(RuleApp
+>			[Hypothesis $ Var "Q"]
+>			[] (trivial $ Var "P")
 >			)
 >		@?= Right ([trivial $ Var "P"], trivial $ Var "Q")
 
 >	,interpretProof2
->			(RuleApp leibniz_equiv_rightOr [Var "F"]
->				[Hypothesis (App "<->" [Var "G", Var "H"])]
+>			(RuleApp
+>			[Hypothesis (App "<->" [Var "G", Var "H"])]
+>			[Var "F"] leibniz_equiv_rightOr
 >			)
 >		@?= Right ([leibniz_equiv_rightOr], leibniz_equiv_rightOr)
 
+The first really useful proof::
+
 >	,interpretProof2
->			(RuleApp inf1a_top []
->				[Hypothesis (App "\\/" [Var "F", Var "G"])
->				,RuleApp leibniz_equiv_rightOr [Var "F"]
->					[Hypothesis (App "<->" [Var "G", Var "H"])]
->				]
+>			(RuleApp
+>			[Hypothesis (App "\\/" [Var "F", Var "G"])
+>			,	RuleApp
+>				[Hypothesis (App "<->" [Var "G", Var "H"])]
+>				[Var "F"] leibniz_equiv_rightOr
+>			]
+>			[] inf1a_top
 >			)
 >		@?= Right ([inf1a_top, leibniz_equiv_rightOr], inf1a_rightOr)
 >			--TODO: make sure that order/duplicates of hypotheses

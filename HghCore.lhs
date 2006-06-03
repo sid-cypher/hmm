@@ -141,7 +141,7 @@ Now on to proofs::
 
 > data Proof
 >	= Hypothesis Expression
->	| RuleApp InferenceRule [Expression] [Proof]
+>	| RuleApp [Proof] [Expression] InferenceRule
 >	deriving (Eq, Show)
 
 TODO: Explain what the components of a RuleApp mean, and what it means for a
@@ -234,7 +234,7 @@ that from any expression we can derive any expression.
 
 ``RuleApp`` is the interesting case::
 
-> interpretProof (RuleApp rule varExprs subproofs)
+> interpretProof (RuleApp subproofs varExprs rule)
 
 First we handle the inconsistent uses of ``RuleApp``.  There needs to be
 exactly one subproof per rule hypothesis::
