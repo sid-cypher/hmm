@@ -97,6 +97,9 @@ to a target expression (the conclusion). ::
 >	}
 >	deriving (Eq, Show)
 
+(TODO: Create a custom Show instance, so that we more understandable output
+during debugging.)
+
 Two ``InferenceRule`` objects are equal (under ``Eq``) iff they have the same
 DVRSet, the same hypotheses (in the same order, including potential
 duplicates), and the same conclusion.

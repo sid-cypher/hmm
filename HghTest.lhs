@@ -50,6 +50,17 @@
 >			)
 >		@?= Right ([leibniz_equiv_rightOr], leibniz_equiv_rightOr)
 
+>	,interpretProof2
+>			(RuleApp inf1a_top []
+>				[Hypothesis (App "\\/" [Var "F", Var "G"])
+>				,RuleApp leibniz_equiv_rightOr [Var "F"]
+>					[Hypothesis (App "<->" [Var "G", Var "H"])]
+>				]
+>			)
+>		@?= Right ([inf1a_top, leibniz_equiv_rightOr], inf1a_rightOr)
+>			--TODO: make sure that order/duplicates of hypotheses
+>			--are not important
+
 TODO: Check the stuff from the Appendix.
 
 >	]
@@ -66,6 +77,22 @@ TODO: Check the stuff from the Appendix.
 >					[App "\\/" [Var "F", Var "G"]
 >					,App "\\/" [Var "F", Var "H"]
 >					])
+
+> inf1a_top :: InferenceRule
+> inf1a_top = mkInferenceRule
+>				(mkDVRSet [])
+>				[Var "G"
+>				,App "<->" [Var "G", Var "H"]
+>				]
+>				(Var "H")
+
+> inf1a_rightOr :: InferenceRule
+> inf1a_rightOr = mkInferenceRule
+>				(mkDVRSet [])
+>				[App "\\/" [Var "F", Var "G"]
+>				,App "<->" [Var "G", Var "H"]
+>				]
+>				(App "\\/" [Var "F", Var "H"])
 
 > interpretProof2 :: Proof -> Either String ([InferenceRule], InferenceRule)
 > interpretProof2 proof = case interpretProof proof of
