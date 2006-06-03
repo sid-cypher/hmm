@@ -51,10 +51,14 @@ which is essentially the same as a Ghilbert proof.  ``interpretProof`` then
 computes the resulting 'thm' (the 'target inference rule' of the ``Derivation``).
 What Ghilbert calls a 'thm' or a 'stmt', we call an ::
 
->	,InferenceRule, inferenceRule, ruleDVRs, ruleHypotheses, ruleConclusion
+>	,InferenceRule, mkInferenceRule, ruleDVRs, ruleHypotheses, ruleConclusion
 
 ``interpretProof`` also keeps track of all inference rules that are used by the proof (the
 'source inference rules' of the ``Derivation``).
+
+Part of an ``InferenceRule`` is a set of 'disjoint variable restrictions'::
+
+>	,DVRSet, mkDVRSet
 
 All this is based on LISP-like expressions, just like GHilbert::
 
@@ -87,34 +91,40 @@ An ``InferenceRule`` represents how to get from source expressions (hypotheses)
 to a target expression (the conclusion). ::
 
 > data InferenceRule = InferenceRule
->	{ruleDVRs :: [(String, String)]
+>	{ruleDVRs :: DVRSet
 >	,ruleHypotheses :: [Expression]
 >	,ruleConclusion :: Expression
 >	}
 >	deriving (Eq, Show)
 
+Two ``InferenceRule`` objects are equal (under ``Eq``) iff they have the same
+DVRSet, the same hypotheses (in the same order, including potential
+duplicates), and the same conclusion.
+
 Note that the constructor for this data type is not exported, so that we can
 choose an optimal data structure for performance.  Therefore we need a
-constructor function::
+very simple constructor function::
 
-> inferenceRule :: [(String, String)] -> [Expression] -> Expression
+> mkInferenceRule :: DVRSet -> [Expression] -> Expression
 >			-> InferenceRule
-> inferenceRule dvrs hyps concl = InferenceRule (dvrsCanonical dvrs) hyps concl
+> mkInferenceRule dvrSet hyps concl = InferenceRule dvrSet hyps concl
 
-For performance reasons, we keep the DVRs in an ``InferenceRule`` in canonical
-order::
+Here we use the data type ``DVRSet``, for which we only export the type ::
 
-> dvrsCanonical :: [(String, String)] -> [(String, String)]
-> dvrsCanonical = nub . sort . Prelude.map sortPair
+> data DVRSet = DVRSet [(VarName, VarName)]
+>	deriving (Eq, Show)
+
+To create a ``DVRSet`` the constructor function ``mkDVRSet`` is used.  This
+function makes sure that two DVRSets are equal (under ``Eq``) if they have the
+same restrictions, where duplicates are ignored, and ("x","y") is the same as
+("y","x").  It does that by keeeping the DVRs in an ``InferenceRule`` in
+canonical order, with duplicates removed, and each pair ordered::
+
+> mkDVRSet :: [(VarName, VarName)] -> DVRSet
+> mkDVRSet = DVRSet . nub . sort . Prelude.map sortPair
 >	where sortPair (p, q)
 >		| p <= q = (p, q)
 >		| True = (q, p)
-
-This helps us in the implementation of equality, below.
-
-Two ``InferenceRule`` objects are equal (under ``Eq``) iff they have the same
-DVRs (in any order, ignoring duplicates), the same hypotheses (in the same
-order, including potential duplicates), and the same conclusion.
 
 Because of the canonical representation of an ``InferenceRule``, the
 implementation of ``Eq InferenceRule`` is as simple as "``deriving Eq``" (as is
@@ -213,7 +223,7 @@ The simplest part of the Ghilbert proof algorithm is handling an
 > interpretProof (Hypothesis expr) =
 >	Right $ Derivation
 >		{sourceRules = []
->		,targetRule = inferenceRule [] [expr] expr
+>		,targetRule = mkInferenceRule (mkDVRSet []) [expr] expr
 >		}
 
 In words: any hypothesis proves the simplest possible inference rule, namely
@@ -249,10 +259,10 @@ From the ``RuleApp`` ``Proof`` we can derive that the conclusion of the rule
 (after substitution) follows from all hypotheses of all subproofs::
 
 >			,targetRule = let
->				dvrs = [] --TODO: implement
+>				dvrs = mkDVRSet [] --TODO: implement
 >				hypotheses = concat $ map (ruleHypotheses . targetRule) subderivations
 >				conclusion = substApply substitution (ruleConclusion rule)
->			 in inferenceRule dvrs hypotheses conclusion
+>			 in mkInferenceRule dvrs hypotheses conclusion
 >			}
 
 In the above we used the following definitions::
@@ -359,6 +369,8 @@ The variables occurring in an expression are easily computed::
 > varsOf (Var v) = [v]
 > varsOf (App _c exprs) = concat $ map varsOf exprs
 
+(Note that we do not remove duplicates here; each caller is responsible for
+that.)
 
 Substitutions
 ~~~~~~~~~~~~~

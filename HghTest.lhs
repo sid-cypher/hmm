@@ -26,13 +26,17 @@
 >	"simple data structure tests" ~: test
 >	[Var "x" @?= Var "x"
 
->	,inferenceRule [] [] (Var "P") @?= inferenceRule [] [] (Var "P")
->	,inferenceRule [("P","Q")] [] (Var "P") @?= inferenceRule [("Q","P")] [] (Var "P")
+>	,mkInferenceRule (mkDVRSet []) [] (Var "P")
+>		@?= mkInferenceRule (mkDVRSet []) [] (Var "P")
+>	,mkInferenceRule (mkDVRSet [("P","Q")]) [] (Var "P")
+>		@?= mkInferenceRule (mkDVRSet [("Q","P")]) [] (Var "P")
 
 >	,Hypothesis (Var "P") @?= Hypothesis (Var "P")
->	,RuleApp (inferenceRule [] [] (Var "P")) [Var "Q"] [] @?= RuleApp (inferenceRule [] [] (Var "P")) [Var "Q"] []
+>	,RuleApp (mkInferenceRule (mkDVRSet []) [] (Var "P")) [Var "Q"] []
+>		@?= RuleApp (mkInferenceRule (mkDVRSet []) [] (Var "P")) [Var "Q"] []
 
->	,interpretProof2 (Hypothesis (Var "P")) @?= Right ([], inferenceRule [] [(Var "P")] (Var "P"))
+>	,interpretProof2 (Hypothesis (Var "P"))
+>		@?= Right ([], mkInferenceRule (mkDVRSet []) [(Var "P")] (Var "P"))
 
 >	,interpretProof2
 >			(RuleApp (trivial $ Var "P") []
@@ -52,11 +56,11 @@ TODO: Check the stuff from the Appendix.
 >	]
 
 > trivial :: Expression -> InferenceRule
-> trivial expr = inferenceRule [] [expr] expr
+> trivial expr = mkInferenceRule (mkDVRSet []) [expr] expr
 
 > leibniz_equiv_rightOr :: InferenceRule
-> leibniz_equiv_rightOr = inferenceRule
->				[]
+> leibniz_equiv_rightOr = mkInferenceRule
+>				(mkDVRSet [])
 >				[App "<->" [Var "G", Var "H"]]
 >				(App "<->"
 >					[App "\\/" [Var "F", Var "G"]
