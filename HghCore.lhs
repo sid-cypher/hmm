@@ -261,11 +261,12 @@ In the above we used the following definitions::
 >						(ruleHypotheses rule) subconclusions
 >
 >		substitution :: Substitution
->		substitution =
->			concat (map (\(Right x) -> x) substitutionsOrErrors)
->			++ zip (ruleLocalVars rule) varExprs
+>		substitution = fromRight $ substConcat
+>					( zip (ruleLocalVars rule) varExprs
+>					: map (\(Right x) -> x) substitutionsOrErrors
+>					)
 >			--Note that no substitution key duplication is possible
->			--here
+>			--here, so we can use fromRight
 
 Here the 'rule local variables' are those that only occur in its conclusion,
 and not in its hypotheses::
@@ -387,12 +388,12 @@ It is equally simple to find a substitution from one expression to another::
 >	where
 >		substitutionsOrErrors = zipWith findSubstitution exprs1 exprs2
 >		allOk = allRight substitutionsOrErrors
->		substitutionOrError = substMerge $ map (\(Right x) -> x) substitutionsOrErrors
+>		substitutionOrError = substConcat $ map (\(Right x) -> x) substitutionsOrErrors
 
-For now we implement ``substMerge`` in a very simple way::
+For now we implement ``substConcat`` in a very simple way::
 
-> substMerge :: [Substitution] -> Either String Substitution
-> substMerge = Right . concat
+> substConcat :: [Substitution] -> Either String Substitution
+> substConcat = Right . concat
 
 TODO: check for key duplication!
 
@@ -406,3 +407,13 @@ Error messages
 > allRight [] = True
 > allRight (Left _ : _) = False
 > allRight (Right _ : rest) = allRight rest
+
+
+Either
+~~~~~~
+
+::
+
+> fromRight :: Either a b -> b
+> fromRight (Right b) = b
+> fromRight (Left _a) = error "cannot apply fromRight to a Left value"
