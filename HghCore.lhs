@@ -73,8 +73,15 @@ Expressions and inference rules
 All mathematical expressions are constructed from variables and operators
 (=constants)::
 
-> data Expression = Var String | App String [Expression]
+> data Expression = Var VarName | App ConstName [Expression]
 >	deriving (Eq, Show)
+
+with ::
+
+> type VarName = String
+> type ConstName = String
+
+(TODO: Make these into real datatypes, so that we have real typechecking.)
 
 An ``InferenceRule`` represents how to get from source expressions (hypotheses)
 to a target expression (the conclusion). ::
@@ -271,7 +278,7 @@ In the above we used the following definitions::
 Here the 'rule local variables' are those that only occur in its conclusion,
 and not in its hypotheses::
 
-> ruleLocalVars :: InferenceRule -> [String]
+> ruleLocalVars :: InferenceRule -> [VarName]
 > ruleLocalVars rule =
 >	nub (varsOf (ruleConclusion rule))
 >	\\ concat (map varsOf (ruleHypotheses rule))
@@ -348,7 +355,7 @@ Expressions
 
 The variables occurring in an expression are easily computed::
 
-> varsOf :: Expression -> [String]
+> varsOf :: Expression -> [VarName]
 > varsOf (Var v) = [v]
 > varsOf (App _c exprs) = concat $ map varsOf exprs
 
@@ -358,7 +365,7 @@ Substitutions
 
 A substitution describes how to map variables to expressions::
 
-> type Substitution = [(String, Expression)]
+> type Substitution = [(VarName, Expression)]
 
 Apply a substitution is simple::
 
