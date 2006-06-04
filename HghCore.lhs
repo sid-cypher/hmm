@@ -282,7 +282,7 @@ In the above we used the following definitions::
 >
 >		substitution :: Substitution
 >		substitution = fromRight $ substConcat
->					( zip (ruleLocalVars rule) varExprs
+>					( Substitution (zip (ruleLocalVars rule) varExprs)
 >					: map (\(Right x) -> x) substitutionsOrErrors
 >					)
 >			--Note that no substitution key duplication is possible
@@ -380,12 +380,13 @@ Substitutions
 
 A substitution describes how to map variables to expressions::
 
-> type Substitution = [(VarName, Expression)]
+> data Substitution = Substitution [(VarName, Expression)]
+>	deriving Show
 
 Apply a substitution is simple::
 
 > substApply :: Substitution -> Expression -> Expression
-> substApply s (Var v) = case lookup v s of
+> substApply s@(Substitution m) (Var v) = case lookup v m of
 >				Just expr -> expr
 >				Nothing -> error $ "could not find " ++ show v ++ " in " ++ show s
 > substApply s (App c exprs) = App c (map (substApply s) exprs)
@@ -393,7 +394,7 @@ Apply a substitution is simple::
 It is equally simple to find a substitution from one expression to another::
 
 > findSubstitution :: Expression -> Expression -> Either String Substitution
-> findSubstitution (Var v) expr = Right $ [(v, expr)]
+> findSubstitution (Var v) expr = Right $ Substitution [(v, expr)]
 > findSubstitution expr1@(App _ _) expr2@(Var _) =
 >	Left $ "cannot match " ++ show expr1 ++ " and " ++ show expr2
 > findSubstitution expr1@(App c1 exprs1) expr2@(App c2 exprs2)
@@ -415,7 +416,7 @@ It is equally simple to find a substitution from one expression to another::
 For now we implement ``substConcat`` in a very simple way::
 
 > substConcat :: [Substitution] -> Either String Substitution
-> substConcat = Right . concat
+> substConcat = Right . Substitution . concat . map (\(Substitution m) -> m)
 
 TODO: check for key duplication!
 
