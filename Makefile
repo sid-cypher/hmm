@@ -21,15 +21,24 @@ distclean:
 	rm -f *.o *.hi
 	rm -f hmmTest$(EXE) $(BINARIES)
 	rm -f hghtest$(EXE)
+	rm -f *.was.run
 
 clean: distclean
 	# throw away all derived objects
 	rm -f .htaccess
 	rm -f *.xhtml
 
-check: hmmTest$(EXE) hghtest$(EXE) doc
+check: hmmTest.was.run hghtest.was.run doc
+
+hmmTest.was.run: ./hmmTest$(EXE)
+	rm -f hmmTest.was.run
 	./hmmTest$(EXE)
+	touch hmmTest.was.run
+
+hghtest.was.run: ./hghtest$(EXE)
+	rm -f hghtest.was.run
 	./hghtest$(EXE)
+	touch hghtest.was.run
 
 sitecopy: clean sitecopy-is-safe doc
 	echo "Options +Indexes" > .htaccess
