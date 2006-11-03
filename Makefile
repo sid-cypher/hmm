@@ -40,7 +40,7 @@ hghtest.was.run: ./hghtest$(EXE)
 	./hghtest$(EXE)
 	touch hghtest.was.run
 
-sitecopy: clean sitecopy-is-safe doc
+sitecopy: distclean sitecopy-is-safe doc
 	echo "Options +Indexes" > .htaccess
 	sitecopy -u hmm-repo
 
