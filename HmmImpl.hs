@@ -434,7 +434,20 @@ mapSymbols ctx = map $ \s ->
 
 
 data ProofTree a = Apply a [ProofTree a]
-	deriving (Eq, Show)
+	deriving Eq
+
+instance Show a => Show (ProofTree a) where
+	show p = '\n' : show' p
+		where
+			--TODO: Improve this implementation...
+			show' (Apply a subproofs) =
+				"Apply " ++ show a
+				++ ((unlines . (map ('\t':)) . lines)
+				   $ addBrackets ("\n[]","\n[",",","]") (map show' subproofs))
+			addBrackets :: (String,String,String,String) -> [String] -> String
+			addBrackets (prepost,_pre,_inf,_post) [] = prepost
+			addBrackets (_prepost,pre,_inf,post) [x] = pre ++ x ++ post
+			addBrackets (prepost,pre,inf,post) (x:xs) = pre ++ x ++ addBrackets (prepost,inf,inf,post) xs
 
 mmComputeProofTree :: Proof -> Either String (ProofTree Statement)
 mmComputeProofTree proof = case foldProof proof combine of
