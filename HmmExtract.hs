@@ -29,7 +29,7 @@ substituteHyps m (Apply stat subproofs) | isAssertion stat = Apply stat (map (su
 substituteHyps m proofTree@(Apply (lab, _expr, _info) []) =
 	case lookup lab m of
 		Just p -> p
-		Nothing -> error ("could not find label '" ++ lab ++ "' in map " ++ show m ++ ".  ProofTree = " ++ show proofTree)
+		Nothing -> proofTree
 substituteHyps _ _ = error "this should not occur"
 
 
