@@ -601,4 +601,4 @@ allPairs (a:as) = [(a, a2) | a2 <- as] ++ allPairs as
 
 fromRight :: Show a => Either a b -> b
 fromRight (Right b) = b
-fromRight (Left a) = error ("impossible" ++ show a)
+fromRight (Left a) = error ("impossible: " ++ show a)
