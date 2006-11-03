@@ -1,7 +1,7 @@
 EXE=
 WALL=-Wall
 
-BINARIES=hmmverify$(EXE) hmmprint$(EXE)
+BINARIES=hmmverify$(EXE) hmmprint$(EXE) hmmextract$(EXE)
 
 default: $(BINARIES) check doc
 
@@ -9,6 +9,7 @@ hmmTest$(EXE) $(BINARIES): *.hs
 	ghc ${WALL} -Werror -O -o hmmTest --make HmmTest
 	ghc ${WALL} -Werror -O -o hmmverify --make HmmVerify
 	ghc ${WALL} -Werror -O -o hmmprint --make HmmPrint
+	ghc ${WALL} -Werror -O -o hmmextract --make HmmExtract
 
 hghtest$(EXE): *.lhs
 	ghc ${WALL} -Werror -O -o hghtest --make HghTest
