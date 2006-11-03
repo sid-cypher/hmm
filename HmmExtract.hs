@@ -13,7 +13,11 @@ main = do
 			let (_lab, _expr, Theorem _hyps _dvrset proof) = findStatement db theoremLabel
 			putStrLn $ toMMProof $ expandProofTree $ toProofTree proof
 
-
+{-
+   TODO: The DVRSets are not taken into account, so some $d statements need to
+   be added for the proof to be accepted.  (Or is this because Metamath is stricter
+   than hmmverify?)
+-}
 
 expandProofTree :: ProofTree Statement -> ProofTree Statement
 expandProofTree (Apply (_lab, _expr, Theorem hyps _dvrset proof) subproofs) =
@@ -22,10 +26,12 @@ expandProofTree (Apply (_lab, _expr, Theorem hyps _dvrset proof) subproofs) =
 				hyps
 				subproofs
 	in expandProofTree (substituteHyps hypMap (toProofTree proof))
-expandProofTree (Apply stat subproofs) = Apply stat (map expandProofTree subproofs)
+expandProofTree (Apply stat subproofs) =
+	Apply stat (map expandProofTree subproofs)
 
 substituteHyps :: [(Label, ProofTree Statement)] -> ProofTree Statement -> ProofTree Statement
-substituteHyps m (Apply stat subproofs) | isAssertion stat = Apply stat (map (substituteHyps m) subproofs)
+substituteHyps m (Apply stat subproofs) | isAssertion stat =
+	Apply stat (map (substituteHyps m) subproofs)
 substituteHyps m proofTree@(Apply (lab, _expr, _info) []) =
 	case lookup lab m of
 		Just p -> p
