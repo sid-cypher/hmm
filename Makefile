@@ -1,9 +1,11 @@
 EXE=
 WALL=-Wall
 
-default: hmmverify$(EXE) hmmprint$(EXE) check doc
+BINARIES=hmmverify$(EXE) hmmprint$(EXE)
 
-hmmTest$(EXE) hmmverify$(EXE) hmmprint$(EXE): *.hs
+default: $(BINARIES) check doc
+
+hmmTest$(EXE) $(BINARIES): *.hs
 	ghc ${WALL} -Werror -O -o hmmTest --make HmmTest
 	ghc ${WALL} -Werror -O -o hmmverify --make HmmVerify
 	ghc ${WALL} -Werror -O -o hmmprint --make HmmPrint
@@ -13,12 +15,14 @@ hghtest$(EXE): *.lhs
 
 doc: HghCore.xhtml
 
-distclean::
+distclean:
+	# throw away everything that is not for publication
 	rm -f *.o *.hi
-	rm -f hmmTest$(EXE) hmmverify$(EXE) hmmprint$(EXE)
+	rm -f hmmTest$(EXE) $(BINARIES)
 	rm -f hghtest$(EXE)
 
-clean:: distclean
+clean: distclean
+	# throw away all derived objects
 	rm -f .htaccess
 	rm -f *.xhtml
 
