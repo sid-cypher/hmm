@@ -1,6 +1,6 @@
 module Hmm
 	(
-	,Database
+	 Database
 	,mmParseFromFile,mmParseFromString
 	,mmVerifiesProof,mmVerifiesLabel,mmVerifiesDatabase,mmVerifiesAll
 	)

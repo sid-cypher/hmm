@@ -50,6 +50,6 @@ sitecopy-is-safe:
 		|| (echo "You have unrecorded changes!" && false)
 
 %.xhtml: %.lhs
-	rst2html.py --exit-status=info --report=info --source-link --generator --date --time $< $@ \
+	rst2html --exit-status=info --report=info --source-link --generator --date --time $< $@ \
 		|| (rm -f $@ && false)
 

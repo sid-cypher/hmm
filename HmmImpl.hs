@@ -216,13 +216,13 @@ mmpStatement =
 
 mmpSeparator :: MMParser ()
 mmpSeparator = do
-		many1 ((space >> return ()) <|> mmpComment)
+		_ <- many1 ((space >> return ()) <|> mmpComment)
 		return ()
 
 mmpComment :: MMParser ()
 mmpComment = do
-		try (string "$(")
-		manyTill anyChar (try (space >> string "$)"))
+		_ <- try (string "$(")
+		_ <- manyTill anyChar (try (space >> string "$)"))
 		return ()
 	    <?> "comment"
 
@@ -276,7 +276,7 @@ mmpDollarF = do
 		mmpSeparator
 		v <- mmpIdentifier
 		mmpSeparator
-		string "$."
+		_ <- string "$."
 		ctx <- getState
 		let stat = (lab, mapSymbols ctx [c, v], DollarF)
 		setState (ctx `ctxWithStatement` stat `ctxWithActiveHyps` [stat])
@@ -316,7 +316,7 @@ mmpUncompressedProof = do
 
 mmpCompressedProof :: [Statement] -> MMParser Proof
 mmpCompressedProof mandatoryStatements = do
-		string "("
+		_ <- string "("
 		mmpSeparator
 		assertionLabels <- mmpSepListEndBy mmpLabel ")"
 		mmpSeparator
@@ -397,7 +397,7 @@ mmpBlock = do
 		db <- mmpStatements
 		let assertions = filter isAssertion (case db of Database d -> d)
 		setState (ctx `ctxWithStatements` assertions)
-		string "$}"
+		_ <- string "$}"
 		return (Database assertions)
 
 mmpTryUnlabeled :: String -> MMParser ()
@@ -407,7 +407,7 @@ mmpTryLabeled :: String -> MMParser Label
 mmpTryLabeled keyword = (try $ do
 				lab <- mmpLabel
 				mmpSeparator
-				string keyword
+				_ <- string keyword
 				return lab
 			) <?> ("labeled " ++ keyword ++ " keyword")
 

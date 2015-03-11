@@ -43,15 +43,15 @@ substituteHyps _ _ = error "this should not occur"
 -- HELPER FUNCTIONS (move to HmmImpl.hs or elsewhere?)
 
 toMMProof :: ProofTree Statement -> String
-toMMProof (Apply stat subproofs) = join (map toMMProof subproofs ++ [labelOf stat])
+toMMProof (Apply stat subproofs) = joinWithSpaces (map toMMProof subproofs ++ [labelOf stat])
 
 labelOf :: Statement -> String
 labelOf (lab, _expr, _info) = lab
 
-join :: [String] -> String
-join [] = ""
-join [x] = x
-join (x:xs) = x ++ " " ++ join xs
+joinWithSpaces :: [String] -> String
+joinWithSpaces [] = ""
+joinWithSpaces [x] = x
+joinWithSpaces (x:xs) = x ++ " " ++ joinWithSpaces xs
 
 toProofTree :: Proof -> ProofTree Statement
 toProofTree = fromRight . mmComputeProofTree
